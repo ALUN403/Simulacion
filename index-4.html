@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flocking y Campos de Potencial</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0c10;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #c5c6c7;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 340px;
+            background: rgba(31, 40, 51, 0.3);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(102, 252, 241, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid rgba(102, 252, 241, 0.3);
+            padding-bottom: 10px;
+            color: #66fcf1;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #45a29e;
+        }
+        .desc {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: -2px;
+            margin-bottom: 8px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Control de Flocking</h2>
+        
+        <div class="control-group">
+            <label><span>Agentes en Bandada</span> <span id="val-agentes">15</span></label>
+            <input type="range" id="slider-agentes" min="1" max="30" value="15">
+        </div>
+
+        <div class="control-group">
+            <label><span>Obstáculos (Potencial)</span> <span id="val-obstaculos">3</span></label>
+            <input type="range" id="slider-obstaculos" min="0" max="8" value="3">
+        </div>
+
+        <div class="control-group">
+            <label><span>Ruido de Sensores (%)</span> <span id="val-ruido">10%</span></label>
+            <span class="desc">Simula perturbación en la lectura de distancias</span>
+            <input type="range" id="slider-ruido" min="0" max="50" value="10">
+        </div>
+
+        <div class="control-group">
+            <label><span>Fuerza de Cohesión</span> <span id="val-flock">1.0</span></label>
+            <span class="desc">Atracción hacia el centroide del grupo</span>
+            <input type="range" id="slider-flock" min="0" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label><span>Distancia de Seguridad</span> <span id="val-dist">40px</span></label>
+            <span class="desc">Radio de repulsión entre compañeros</span>
+            <input type="range" id="slider-dist" min="15" max="80" value="40">
+        </div>
+        
+        <p style="font-size: 0.75rem; color: #45a29e; margin-top: 15px; text-align: center;">Arrastra los obstáculos con el ratón.</p>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Variables Globales de Control
+        let numAgentes = 15;
+        let numObstaculos = 3;
+        let nivelRuido = 10; // Porcentaje
+        let flockStrength = 1.0;
+        let safeDist = 40;
+
+        // Referencias UI
+        document.getElementById('slider-agentes').addEventListener('input', (e) => { numAgentes = parseInt(e.target.value); document.getElementById('val-agentes').innerText = numAgentes; ajustarAgentes(); });
+        document.getElementById('slider-obstaculos').addEventListener('input', (e) => { numObstaculos = parseInt(e.target.value); document.getElementById('val-obstaculos').innerText = numObstaculos; ajustarObstaculos(); });
+        document.getElementById('slider-ruido').addEventListener('input', (e) => { nivelRuido = parseInt(e.target.value); document.getElementById('val-ruido').innerText = nivelRuido + '%'; });
+        document.getElementById('slider-flock').addEventListener('input', (e) => { flockStrength = parseFloat(e.target.value); document.getElementById('val-flock').innerText = flockStrength.toFixed(1); });
+        document.getElementById('slider-dist').addEventListener('input', (e) => { safeDist = parseInt(e.target.value); document.getElementById('val-dist').innerText = safeDist + 'px'; });
+
+        class Agente {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.maxSpeed = 3.5;
+                this.color = `hsl(${160 + Math.random() * 40}, 80%, 60%)`; // Tonos cyan/verde
+            }
+
+            update(agentes, obstaculos) {
+                let sep = {x: 0, y: 0};
+                let ali = {x: 0, y: 0};
+                let coh = {x: 0, y: 0};
+                let obsRep = {x: 0, y: 0};
+                let vecinosFlock = 0;
+
+                for (let a of agentes) {
+                    if (a === this) continue;
+                    let dx = a.x - this.x;
+                    let dy = a.y - this.y;
+                    let distReal = Math.sqrt(dx*dx + dy*dy);
+                    
+                    // Aplicar ruido a la medición del sensor
+                    let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
+                    let distPercibida = Math.max(0.1, distReal + errorMedicion);
+
+                    // 1. Distancia de Seguridad (Separación)
+                    if (distPercibida < safeDist) {
+                        sep.x -= (dx / distPercibida);
+                        sep.y -= (dy / distPercibida);
+                    }
+
+                    // 2. Cohesión y Alineación (Flocking)
+                    if (distPercibida < 150) {
+                        ali.x += a.vx;
+                        ali.y += a.vy;
+                        coh.x += a.x;
+                        coh.y += a.y;
+                        vecinosFlock++;
+                    }
+                }
+
+                if (vecinosFlock > 0) {
+                    ali.x /= vecinosFlock;
+                    ali.y /= vecinosFlock;
+                    coh.x = (coh.x / vecinosFlock) - this.x;
+                    coh.y = (coh.y / vecinosFlock) - this.y;
+                }
+
+                // 3. Evasión de Obstáculos (Campo de Potencial)
+                for (let o of obstaculos) {
+                    let dx = this.x - o.x;
+                    let dy = this.y - o.y;
+                    let distReal = Math.sqrt(dx*dx + dy*dy);
+                    
+                    let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
+                    let distPercibida = Math.max(0.1, distReal + errorMedicion);
+                    
+                    let radioEfectivo = o.radius + 120; // Rango del gradiente
+                    if (distPercibida < radioEfectivo) {
+                        // Gradiente de potencial inversamente proporcional a la distancia
+                        let fuerzaRepulsion = 1 - (distPercibida / radioEfectivo);
+                        obsRep.x += (dx / distReal) * (fuerzaRepulsion * 8); 
+                        obsRep.y += (dy / distReal) * (fuerzaRepulsion * 8);
+                    }
+                }
+
+                // Integrar fuerzas
+                this.vx += (sep.x * 0.1) + (ali.x * 0.05 * flockStrength) + (coh.x * 0.01 * flockStrength) + (obsRep.x * 0.15);
+                this.vy += (sep.y * 0.1) + (ali.y * 0.05 * flockStrength) + (coh.y * 0.01 * flockStrength) + (obsRep.y * 0.15);
+
+                // Limitar velocidad máxima
+                let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                if (speed > this.maxSpeed) {
+                    this.vx = (this.vx / speed) * this.maxSpeed;
+                    this.vy = (this.vy / speed) * this.maxSpeed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Rebotar orgánicamente en los bordes
+                let margen = 30;
+                if (this.x < margen) this.vx += 0.5;
+                if (this.x > canvas.width - margen) this.vx -= 0.5;
+                if (this.y < margen) this.vy += 0.5;
+                if (this.y > canvas.height - margen) this.vy -= 0.5;
+            }
+
+            draw() {
+                let angle = Math.atan2(this.vy, this.vx);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+                
+                // Dibujar agente como un triángulo/flecha
+                ctx.beginPath();
+                ctx.moveTo(12, 0); // Punta
+                ctx.lineTo(-8, 6);
+                ctx.lineTo(-4, 0); // Hendidura trasera
+                ctx.lineTo(-8, -6);
+                ctx.closePath();
+                
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Anillo tenue mostrando la distancia de seguridad
+                ctx.beginPath();
+                ctx.arc(0, 0, safeDist, 0, Math.PI * 2);
+                ctx.strokeStyle = "rgba(102, 252, 241, 0.05)";
+                ctx.stroke();
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+        }
+
+        class Obstaculo {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 35;
+                this.isDragging = false;
+            }
+            draw() {
+                // Núcleo del obstáculo
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.isDragging ? "rgba(255, 65, 85, 0.8)" : "rgba(197, 198, 199, 0.2)";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                ctx.stroke();
+
+                // Anillos de curvas de nivel (Campo de Potencial)
+                for (let i = 1; i <= 3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + (i * 40), 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 65, 85, ${0.3 / i})`;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+        let agentes = [];
+        let obstaculos = [];
+        let draggingObstacle = null;
+
+        function init() {
+            for (let i = 0; i < numAgentes; i++) {
+                agentes.push(new Agente(canvas.width / 2 + (Math.random() - 0.5) * 300, canvas.height / 2 + (Math.random() - 0.5) * 300));
+            }
+            for (let i = 0; i < numObstaculos; i++) {
+                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 600, canvas.height / 2 + (Math.random() - 0.5) * 400));
+            }
+        }
+
+        function ajustarAgentes() {
+            while (agentes.length < numAgentes) agentes.push(new Agente(canvas.width / 2, canvas.height / 2));
+            while (agentes.length > numAgentes) agentes.pop();
+        }
+
+        function ajustarObstaculos() {
+            while (obstaculos.length < numObstaculos) obstaculos.push(new Obstaculo(canvas.width / 2, canvas.height / 2));
+            while (obstaculos.length > numObstaculos) obstaculos.pop();
+        }
+
+        // Interacción con ratón
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            for (let obs of obstaculos) {
+                let dx = mouseX - obs.x;
+                let dy = mouseY - obs.y;
+                if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
+                    draggingObstacle = obs;
+                    obs.isDragging = true;
+                    canvas.style.cursor = 'grabbing';
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            if (draggingObstacle) {
+                draggingObstacle.x = mouseX;
+                draggingObstacle.y = mouseY;
+            } else {
+                let overObs = false;
+                for (let obs of obstaculos) {
+                    let dx = mouseX - obs.x;
+                    let dy = mouseY - obs.y;
+                    if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
+                        overObs = true;
+                        break;
+                    }
+                }
+                canvas.style.cursor = overObs ? 'grab' : 'default';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (draggingObstacle) {
+                draggingObstacle.isDragging = false;
+                draggingObstacle = null;
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        function animate() {
+            // Fondo con rastro
+            ctx.fillStyle = "rgba(11, 12, 16, 0.4)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let obs of obstaculos) {
+                obs.draw();
+            }
+            
+            for (let agente of agentes) {
+                agente.update(agentes, obstaculos);
+                agente.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
