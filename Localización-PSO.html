@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Localización EV3 con PSO en Red Malla (Bluetooth)</title>
+    <title>Localización PSO en Red Malla (Bluetooth)</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -29,7 +29,7 @@
 <body>
 
     <div id="ui-panel">
-        <h2>PSO EV3: Red Bluetooth</h2>
+        <h2>PSO: Red Bluetooth</h2>
         
         <div class="control-group">
             <label><span>Robots EV3</span> <span id="val-robots">30</span></label>
@@ -103,11 +103,13 @@
                 this.y = Math.random() * canvas.height;
                 this.vx = (Math.random() - 0.5) * 6;
                 this.vy = (Math.random() - 0.5) * 6;
+                this.radius = 10;
+                this.color = '#58a6ff'; // Mantenemos el azul brillante para la red BT
                 
                 this.pBestX = this.x;
                 this.pBestY = this.y;
                 this.pBestScore = evaluarCosto(this.x, this.y);
-                this.vecinos = []; // Almacena conexiones BT
+                this.vecinos = []; 
             }
 
             update(todosLosRobots) {
@@ -119,7 +121,6 @@
                     this.pBestY = this.y;
                 }
 
-                // Lógica de Red Malla (Local Best)
                 let nBestX = this.pBestX;
                 let nBestY = this.pBestY;
                 let nBestScore = this.pBestScore;
@@ -132,7 +133,7 @@
                     let dist = Math.sqrt(dx*dx + dy*dy);
 
                     if (dist < btRange) {
-                        this.vecinos.push(r); // Conectado por Bluetooth
+                        this.vecinos.push(r); 
                         if (r.pBestScore < nBestScore) {
                             nBestScore = r.pBestScore;
                             nBestX = r.pBestX;
@@ -141,7 +142,6 @@
                     }
                 }
 
-                // Ecuación PSO con Local Best
                 let r1 = Math.random();
                 let r2 = Math.random();
                 
@@ -153,7 +153,6 @@
                           (c1 * r1 * (this.pBestY - this.y)) + 
                           (c2 * r2 * (nBestY - this.y));
 
-                // Cinemática suavizada (evitar giros instantáneos irreales)
                 const maxVel = 6.5;
                 let velMag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
                 if (velMag > maxVel) {
@@ -164,7 +163,6 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Límites de la arena
                 if (this.x < 10) { this.x = 10; this.vx *= -0.5; }
                 if (this.x > canvas.width - 10) { this.x = canvas.width - 10; this.vx *= -0.5; }
                 if (this.y < 10) { this.y = 10; this.vy *= -0.5; }
@@ -176,8 +174,6 @@
                     ctx.beginPath();
                     ctx.moveTo(this.x, this.y);
                     ctx.lineTo(v.x, v.y);
-                    
-                    // La opacidad depende de la distancia (más cerca = señal más fuerte)
                     let dist = Math.hypot(this.x - v.x, this.y - v.y);
                     let opacidad = 1 - (dist / btRange);
                     ctx.strokeStyle = `rgba(88, 166, 255, ${opacidad * 0.3})`;
@@ -191,22 +187,39 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(angle);
 
-                // Chasis principal EV3
-                ctx.fillStyle = '#21262d';
-                ctx.fillRect(-12, -10, 24, 20);
+                // Configurar sombra suave
+                ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = -2;
+                ctx.shadowOffsetY = 3;
                 
-                // Bordes del chasis
-                ctx.strokeStyle = '#8b949e';
-                ctx.lineWidth = 1.5;
-                ctx.strokeRect(-12, -10, 24, 20);
+                // Cuerpo circular
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Borde blanco grueso
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
 
-                // Sensor ultrasónico (ojos) brillando al frente
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#58a6ff';
-                ctx.fillStyle = '#58a6ff';
-                ctx.fillRect(8, -6, 6, 4);
-                ctx.fillRect(8, 2, 6, 4);
-                ctx.shadowBlur = 0; // Resetear sombra para no afectar otras figuras
+                // Quitar la sombra para los detalles internos
+                ctx.shadowColor = "transparent";
+
+                // Línea direccional interna
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.radius, 0);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // Esfera indicadora en la punta del vector
+                ctx.beginPath();
+                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
             }
@@ -223,30 +236,25 @@
             objetivo.x = e.clientX;
             objetivo.y = e.clientY;
             
-            // Al mover el objetivo, las memorias pasadas ya no sirven
             particulas.forEach(p => {
                 p.pBestScore = evaluarCosto(p.pBestX, p.pBestY);
             });
         });
 
         function animate() {
-            // Fondo oscuro puro para alto contraste
             ctx.fillStyle = "rgba(13, 17, 23, 1)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Rejilla de fondo
             ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
             ctx.lineWidth = 1;
             for(let i = 0; i < canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
             for(let i = 0; i < canvas.height; i+=100) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
 
-            // Dibujar Objetivo (Baliza)
             ctx.beginPath();
             ctx.arc(objetivo.x, objetivo.y, 12, 0, Math.PI * 2);
             ctx.fillStyle = '#f85149';
             ctx.fill();
             
-            // Anillos de transmisión de la baliza
             let time = Date.now() * 0.002;
             for(let i=1; i<=3; i++) {
                 ctx.beginPath();
@@ -257,17 +265,14 @@
                 ctx.stroke();
             }
 
-            // 1. Actualizar lógica matemática
             for (let p of particulas) {
                 p.update(particulas);
             }
 
-            // 2. Dibujar capa de comunicaciones (líneas debajo de los robots)
             for (let p of particulas) {
                 p.drawConexiones();
             }
 
-            // 3. Dibujar hardware (robots por encima de las líneas)
             for (let p of particulas) {
                 p.drawRobot();
             }
