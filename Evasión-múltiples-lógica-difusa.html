@@ -58,8 +58,8 @@
         </div>
 
         <div class="legend">
-            <div class="legend-item"><div class="dot" style="background: #00e5ff;"></div> Enjambre A</div>
-            <div class="legend-item"><div class="dot" style="background: #ff007f;"></div> Enjambre B</div>
+            <div class="legend-item"><div class="dot" style="background: #00a8ff;"></div> Enjambre A</div>
+            <div class="legend-item"><div class="dot" style="background: #ff4757;"></div> Enjambre B</div>
         </div>
         <p style="font-size: 0.7rem; color: #888; text-align: center; margin-top: 15px;">Puedes arrastrar las metas (círculos grandes) con el ratón.</p>
     </div>
@@ -84,8 +84,8 @@
         document.getElementById('slider-externa').oninput = e => { factorExterno = parseFloat(e.target.value); document.getElementById('val-externa').innerText = factorExterno.toFixed(1); };
 
         const EQUIPOS = [
-            { id: 0, color: '#00e5ff', metaColor: 'rgba(0, 229, 255, 0.3)' },
-            { id: 1, color: '#ff007f', metaColor: 'rgba(255, 0, 127, 0.3)' }
+            { id: 0, color: '#00a8ff', metaColor: 'rgba(0, 168, 255, 0.3)' },
+            { id: 1, color: '#ff4757', metaColor: 'rgba(255, 71, 87, 0.3)' }
         ];
 
         class Meta {
@@ -125,10 +125,10 @@
                 this.equipo = equipo;
                 this.x = x; this.y = y;
                 this.vx = 0; this.vy = 0;
-                this.radius = 8;
+                this.radius = 12; // Aumentado para visualizar mejor los detalles
                 this.maxSpeed = 3.0;
                 this.color = EQUIPOS[equipo].color;
-                this.fuerzaExternaActiva = false; // Para efectos visuales
+                this.fuerzaExternaActiva = false; 
             }
 
             update(agentes, metas) {
@@ -156,10 +156,10 @@
 
                     if (a.equipo === this.equipo) {
                         // 2. Fuerza Interna (Cohesión/Separación)
-                        if (dist < 40) { // Separación suave
+                        if (dist < 40) { 
                             f_interna.x += (dx / dist) * 1.5;
                             f_interna.y += (dy / dist) * 1.5;
-                        } else if (dist < 120) { // Cohesión suave
+                        } else if (dist < 120) { 
                             f_interna.x -= (dx / dist) * 0.2;
                             f_interna.y -= (dy / dist) * 0.2;
                         }
@@ -167,7 +167,6 @@
                         // 3. Fuerza Externa inter-enjambre (Takagi-Sugeno)
                         if (dist < 70) {
                             this.fuerzaExternaActiva = true;
-                            // Función agresiva exponencial inversa a la distancia
                             let fuerzaTS = Math.pow((70 - dist) / 70, 2) * 5; 
                             f_externa.x += (dx / dist) * fuerzaTS;
                             f_externa.y += (dy / dist) * fuerzaTS;
@@ -186,13 +185,11 @@
                 f_externa.x *= factorExterno;
                 f_externa.y *= factorExterno;
 
-                // Si hay evasión externa intensa, se reduce la atracción a la meta (prioridad de seguridad)
                 let reduccionMeta = this.fuerzaExternaActiva ? 0.2 : 1.0;
 
                 this.vx += (f_meta.x * reduccionMeta) + f_interna.x + f_externa.x;
                 this.vy += (f_meta.y * reduccionMeta) + f_interna.y + f_externa.y;
 
-                // Fricción y límite de velocidad
                 this.vx *= 0.95; this.vy *= 0.95;
                 let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
                 if (speed > this.maxSpeed) {
@@ -208,15 +205,38 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(angle);
                 
+                // Sombra suave
+                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = -2;
+                ctx.shadowOffsetY = 3;
+                
+                // Cuerpo circular
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
                 
-                // Vector direccional
+                // Borde blanco
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.shadowColor = "transparent";
+
+                // Línea direccional interna
                 ctx.beginPath();
-                ctx.moveTo(0, 0); ctx.lineTo(this.radius + 6, 0);
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.radius, 0);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // Antena en la punta
+                ctx.beginPath();
+                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
             }
@@ -242,7 +262,6 @@
             }
         }
 
-        // Interacción para arrastrar metas
         canvas.addEventListener('mousedown', e => {
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
@@ -263,7 +282,7 @@
         });
 
         function animate() {
-            ctx.fillStyle = "rgba(17, 17, 17, 0.4)"; // Rastro suave
+            ctx.fillStyle = "rgba(17, 17, 17, 0.4)"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             for (let m of metas) { m.update(); m.draw(); }
