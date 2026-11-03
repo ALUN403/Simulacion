@@ -110,7 +110,7 @@
         class RobotReactivo {
             constructor(id) {
                 this.id = id;
-                this.radius = 12; // Radio actualizado para el nuevo diseño circular
+                this.radius = 12;
                 this.x = 50 + Math.random() * 100;
                 this.y = 50 + Math.random() * (canvas.height - 100);
                 this.angle = 0; 
@@ -121,8 +121,8 @@
                 
                 this.cooldownColision = 0; 
                 
-                // Color similar al que pasaste de ejemplo (un magenta vibrante)
-                this.color = '#e84393'; 
+                // Color azul vibrante
+                this.color = '#00a8ff'; 
             }
 
             update(todosRobots) {
