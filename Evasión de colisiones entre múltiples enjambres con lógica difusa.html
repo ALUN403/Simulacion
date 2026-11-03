@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evasión Multi-Enjambre Difusa</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #111;
+            font-family: 'Segoe UI', sans-serif; color: #eee;
+        }
+        canvas { display: block; }
+        #ui-panel {
+            position: absolute; top: 20px; left: 20px; width: 340px;
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px; padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 10;
+        }
+        h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .desc { font-size: 0.7rem; color: #999; display: block; margin-top: -3px; margin-bottom: 5px; }
+        .legend { display: flex; justify-content: space-around; margin-top: 15px; font-size: 0.8rem; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Dinámica Multi-Enjambre</h2>
+        
+        <div class="control-group">
+            <label><span>Robots por Grupo</span> <span id="val-robots">15</span></label>
+            <input type="range" id="slider-robots" min="1" max="25" value="15">
+        </div>
+
+        <div class="control-group">
+            <label><span>Fuerza a Objetivo</span> <span id="val-meta">1.0</span></label>
+            <span class="desc">Atracción hacia su respectiva meta</span>
+            <input type="range" id="slider-meta" min="0" max="3" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label><span>Cohesión Interna (Mamdani)</span> <span id="val-interna">1.0</span></label>
+            <span class="desc">Fuerza para mantenerse en grupo</span>
+            <input type="range" id="slider-interna" min="0" max="3" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label><span>Repulsión Inter-Grupo (T-S)</span> <span id="val-externa">2.0</span></label>
+            <span class="desc">Prioridad agresiva anti-choques externos</span>
+            <input type="range" id="slider-externa" min="0" max="5" step="0.1" value="2.0">
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background: #00e5ff;"></div> Enjambre A</div>
+            <div class="legend-item"><div class="dot" style="background: #ff007f;"></div> Enjambre B</div>
+        </div>
+        <p style="font-size: 0.7rem; color: #888; text-align: center; margin-top: 15px;">Puedes arrastrar las metas (círculos grandes) con el ratón.</p>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let numPorGrupo = 15;
+        let factorMeta = 1.0;
+        let factorInterno = 1.0;
+        let factorExterno = 2.0;
+
+        document.getElementById('slider-robots').oninput = e => { numPorGrupo = parseInt(e.target.value); document.getElementById('val-robots').innerText = numPorGrupo; ajustarAgentes(); };
+        document.getElementById('slider-meta').oninput = e => { factorMeta = parseFloat(e.target.value); document.getElementById('val-meta').innerText = factorMeta.toFixed(1); };
+        document.getElementById('slider-interna').oninput = e => { factorInterno = parseFloat(e.target.value); document.getElementById('val-interna').innerText = factorInterno.toFixed(1); };
+        document.getElementById('slider-externa').oninput = e => { factorExterno = parseFloat(e.target.value); document.getElementById('val-externa').innerText = factorExterno.toFixed(1); };
+
+        const EQUIPOS = [
+            { id: 0, color: '#00e5ff', metaColor: 'rgba(0, 229, 255, 0.3)' },
+            { id: 1, color: '#ff007f', metaColor: 'rgba(255, 0, 127, 0.3)' }
+        ];
+
+        class Meta {
+            constructor(equipo, x, y) {
+                this.equipo = equipo;
+                this.x = x; this.y = y;
+                this.radius = 30;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+                this.isDragging = false;
+            }
+            update() {
+                if (!this.isDragging) {
+                    this.x += this.vx; this.y += this.vy;
+                    if (this.x < 50 || this.x > canvas.width - 50) this.vx *= -1;
+                    if (this.y < 50 || this.y > canvas.height - 50) this.vy *= -1;
+                }
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = EQUIPOS[this.equipo].metaColor;
+                ctx.fill();
+                ctx.strokeStyle = EQUIPOS[this.equipo].color;
+                ctx.lineWidth = 2; ctx.stroke();
+                
+                // Icono cruz
+                ctx.beginPath();
+                ctx.moveTo(this.x - 10, this.y); ctx.lineTo(this.x + 10, this.y);
+                ctx.moveTo(this.x, this.y - 10); ctx.lineTo(this.x, this.y + 10);
+                ctx.stroke();
+            }
+        }
+
+        class Agente {
+            constructor(equipo, x, y) {
+                this.equipo = equipo;
+                this.x = x; this.y = y;
+                this.vx = 0; this.vy = 0;
+                this.radius = 8;
+                this.maxSpeed = 3.0;
+                this.color = EQUIPOS[equipo].color;
+                this.fuerzaExternaActiva = false; // Para efectos visuales
+            }
+
+            update(agentes, metas) {
+                let f_meta = {x: 0, y: 0};
+                let f_interna = {x: 0, y: 0};
+                let f_externa = {x: 0, y: 0};
+                this.fuerzaExternaActiva = false;
+
+                // 1. Fuerza hacia su meta
+                let meta = metas[this.equipo];
+                let dxM = meta.x - this.x; let dyM = meta.y - this.y;
+                let distM = Math.sqrt(dxM*dxM + dyM*dyM);
+                if (distM > 0) {
+                    f_meta.x = (dxM / distM) * 0.5 * factorMeta;
+                    f_meta.y = (dyM / distM) * 0.5 * factorMeta;
+                }
+
+                // Comparar con todos los demás agentes
+                for (let a of agentes) {
+                    if (a === this) continue;
+                    let dx = this.x - a.x; let dy = this.y - a.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist === 0) dist = 0.1;
+
+                    if (a.equipo === this.equipo) {
+                        // 2. Fuerza Interna (Cohesión/Separación)
+                        if (dist < 40) { // Separación suave
+                            f_interna.x += (dx / dist) * 1.5;
+                            f_interna.y += (dy / dist) * 1.5;
+                        } else if (dist < 120) { // Cohesión suave
+                            f_interna.x -= (dx / dist) * 0.2;
+                            f_interna.y -= (dy / dist) * 0.2;
+                        }
+                    } else {
+                        // 3. Fuerza Externa inter-enjambre (Takagi-Sugeno)
+                        if (dist < 70) {
+                            this.fuerzaExternaActiva = true;
+                            // Función agresiva exponencial inversa a la distancia
+                            let fuerzaTS = Math.pow((70 - dist) / 70, 2) * 5; 
+                            f_externa.x += (dx / dist) * fuerzaTS;
+                            f_externa.y += (dy / dist) * fuerzaTS;
+                            
+                            // Visualizar el choque difuso
+                            ctx.beginPath();
+                            ctx.moveTo(this.x, this.y); ctx.lineTo(a.x, a.y);
+                            ctx.strokeStyle = `rgba(255, 50, 50, ${fuerzaTS / 5})`;
+                            ctx.lineWidth = 1.5; ctx.stroke();
+                        }
+                    }
+                }
+
+                f_interna.x *= factorInterno * 0.1;
+                f_interna.y *= factorInterno * 0.1;
+                f_externa.x *= factorExterno;
+                f_externa.y *= factorExterno;
+
+                // Si hay evasión externa intensa, se reduce la atracción a la meta (prioridad de seguridad)
+                let reduccionMeta = this.fuerzaExternaActiva ? 0.2 : 1.0;
+
+                this.vx += (f_meta.x * reduccionMeta) + f_interna.x + f_externa.x;
+                this.vy += (f_meta.y * reduccionMeta) + f_interna.y + f_externa.y;
+
+                // Fricción y límite de velocidad
+                this.vx *= 0.95; this.vy *= 0.95;
+                let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                if (speed > this.maxSpeed) {
+                    this.vx = (this.vx / speed) * this.maxSpeed;
+                    this.vy = (this.vy / speed) * this.maxSpeed;
+                }
+
+                this.x += this.vx; this.y += this.vy;
+            }
+
+            draw() {
+                let angle = Math.atan2(this.vy, this.vx);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Vector direccional
+                ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.lineTo(this.radius + 6, 0);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+        }
+
+        let agentes = [];
+        let metas = [];
+        let dragMeta = null;
+
+        function init() {
+            metas.push(new Meta(0, canvas.width * 0.2, canvas.height * 0.5));
+            metas.push(new Meta(1, canvas.width * 0.8, canvas.height * 0.5));
+            ajustarAgentes();
+        }
+
+        function ajustarAgentes() {
+            agentes = [];
+            for(let eq = 0; eq < 2; eq++) {
+                let startX = eq === 0 ? canvas.width * 0.8 : canvas.width * 0.2;
+                for (let i = 0; i < numPorGrupo; i++) {
+                    agentes.push(new Agente(eq, startX + (Math.random()-0.5)*150, canvas.height/2 + (Math.random()-0.5)*150));
+                }
+            }
+        }
+
+        // Interacción para arrastrar metas
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
+            for (let m of metas) {
+                if (Math.hypot(mouseX - m.x, mouseY - m.y) <= m.radius) {
+                    dragMeta = m; m.isDragging = true; canvas.style.cursor = 'grabbing'; break;
+                }
+            }
+        });
+        canvas.addEventListener('mousemove', e => {
+            if (dragMeta) {
+                const rect = canvas.getBoundingClientRect();
+                dragMeta.x = e.clientX - rect.left; dragMeta.y = e.clientY - rect.top;
+            }
+        });
+        window.addEventListener('mouseup', () => {
+            if (dragMeta) { dragMeta.isDragging = false; dragMeta = null; canvas.style.cursor = 'default'; }
+        });
+
+        function animate() {
+            ctx.fillStyle = "rgba(17, 17, 17, 0.4)"; // Rastro suave
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let m of metas) { m.update(); m.draw(); }
+            for (let a of agentes) { a.update(agentes, metas); a.draw(); }
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
