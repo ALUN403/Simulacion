@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Localización EV3 con PSO en Red Malla (Bluetooth)</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #0d1117;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #c9d1d9;
+        }
+        canvas { display: block; }
+        #ui-panel {
+            position: absolute; top: 20px; left: 20px; width: 340px;
+            background: rgba(22, 27, 34, 0.75);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            border-radius: 12px; padding: 20px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.8); z-index: 10;
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid rgba(88, 166, 255, 0.3); padding-bottom: 10px; color: #58a6ff; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; font-weight: 500; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #58a6ff; }
+        .desc { font-size: 0.7rem; color: #8b949e; display: block; margin-top: -3px; margin-bottom: 6px; line-height: 1.2; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>PSO EV3: Red Bluetooth</h2>
+        
+        <div class="control-group">
+            <label><span>Robots EV3</span> <span id="val-robots">30</span></label>
+            <input type="range" id="slider-robots" min="5" max="60" value="30">
+        </div>
+
+        <div class="control-group">
+            <label><span>Rango Bluetooth (px)</span> <span id="val-bt">150</span></label>
+            <span class="desc">Radio máximo para compartir información de la meta con otros robots.</span>
+            <input type="range" id="slider-bt" min="50" max="400" value="150">
+        </div>
+
+        <div class="control-group">
+            <label><span>Inercia (w)</span> <span id="val-w">0.70</span></label>
+            <input type="range" id="slider-w" min="0.1" max="1.2" step="0.05" value="0.7">
+        </div>
+
+        <div class="control-group">
+            <label><span>Memoria Propia (c1)</span> <span id="val-c1">1.20</span></label>
+            <input type="range" id="slider-c1" min="0" max="3" step="0.1" value="1.2">
+        </div>
+
+        <div class="control-group">
+            <label><span>Influencia Social (c2)</span> <span id="val-c2">1.80</span></label>
+            <input type="range" id="slider-c2" min="0" max="3" step="0.1" value="1.8">
+        </div>
+
+        <p style="font-size: 0.75rem; color: #58a6ff; text-align: center; margin-top: 20px; border-top: 1px solid rgba(88,166,255,0.2); padding-top: 10px;">
+            📍 Haz clic en el fondo para mover la señal objetivo.
+        </p>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resize() { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Parámetros de Simulación
+        let numRobots = 30;
+        let btRange = 150;
+        let w = 0.7; 
+        let c1 = 1.2; 
+        let c2 = 1.8; 
+
+        document.getElementById('slider-robots').oninput = e => { numRobots = parseInt(e.target.value); document.getElementById('val-robots').innerText = numRobots; initPSO(); };
+        document.getElementById('slider-bt').oninput = e => { btRange = parseInt(e.target.value); document.getElementById('val-bt').innerText = btRange; };
+        document.getElementById('slider-w').oninput = e => { w = parseFloat(e.target.value); document.getElementById('val-w').innerText = w.toFixed(2); };
+        document.getElementById('slider-c1').oninput = e => { c1 = parseFloat(e.target.value); document.getElementById('val-c1').innerText = c1.toFixed(2); };
+        document.getElementById('slider-c2').oninput = e => { c2 = parseFloat(e.target.value); document.getElementById('val-c2').innerText = c2.toFixed(2); };
+
+        let objetivo = { x: canvas.width / 2, y: canvas.height / 2 };
+        let particulas = [];
+
+        function evaluarCosto(x, y) {
+            let dx = x - objetivo.x;
+            let dy = y - objetivo.y;
+            return Math.sqrt(dx*dx + dy*dy);
+        }
+
+        class RobotPSO {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                
+                this.pBestX = this.x;
+                this.pBestY = this.y;
+                this.pBestScore = evaluarCosto(this.x, this.y);
+                this.vecinos = []; // Almacena conexiones BT
+            }
+
+            update(todosLosRobots) {
+                let costoActual = evaluarCosto(this.x, this.y);
+
+                if (costoActual < this.pBestScore) {
+                    this.pBestScore = costoActual;
+                    this.pBestX = this.x;
+                    this.pBestY = this.y;
+                }
+
+                // Lógica de Red Malla (Local Best)
+                let nBestX = this.pBestX;
+                let nBestY = this.pBestY;
+                let nBestScore = this.pBestScore;
+                this.vecinos = [];
+
+                for (let r of todosLosRobots) {
+                    if (r === this) continue;
+                    let dx = this.x - r.x;
+                    let dy = this.y - r.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < btRange) {
+                        this.vecinos.push(r); // Conectado por Bluetooth
+                        if (r.pBestScore < nBestScore) {
+                            nBestScore = r.pBestScore;
+                            nBestX = r.pBestX;
+                            nBestY = r.pBestY;
+                        }
+                    }
+                }
+
+                // Ecuación PSO con Local Best
+                let r1 = Math.random();
+                let r2 = Math.random();
+                
+                this.vx = (w * this.vx) + 
+                          (c1 * r1 * (this.pBestX - this.x)) + 
+                          (c2 * r2 * (nBestX - this.x));
+                          
+                this.vy = (w * this.vy) + 
+                          (c1 * r1 * (this.pBestY - this.y)) + 
+                          (c2 * r2 * (nBestY - this.y));
+
+                // Cinemática suavizada (evitar giros instantáneos irreales)
+                const maxVel = 6.5;
+                let velMag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                if (velMag > maxVel) {
+                    this.vx = (this.vx / velMag) * maxVel;
+                    this.vy = (this.vy / velMag) * maxVel;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Límites de la arena
+                if (this.x < 10) { this.x = 10; this.vx *= -0.5; }
+                if (this.x > canvas.width - 10) { this.x = canvas.width - 10; this.vx *= -0.5; }
+                if (this.y < 10) { this.y = 10; this.vy *= -0.5; }
+                if (this.y > canvas.height - 10) { this.y = canvas.height - 10; this.vy *= -0.5; }
+            }
+
+            drawConexiones() {
+                for (let v of this.vecinos) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(v.x, v.y);
+                    
+                    // La opacidad depende de la distancia (más cerca = señal más fuerte)
+                    let dist = Math.hypot(this.x - v.x, this.y - v.y);
+                    let opacidad = 1 - (dist / btRange);
+                    ctx.strokeStyle = `rgba(88, 166, 255, ${opacidad * 0.3})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+
+            drawRobot() {
+                let angle = Math.atan2(this.vy, this.vx);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+
+                // Chasis principal EV3
+                ctx.fillStyle = '#21262d';
+                ctx.fillRect(-12, -10, 24, 20);
+                
+                // Bordes del chasis
+                ctx.strokeStyle = '#8b949e';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(-12, -10, 24, 20);
+
+                // Sensor ultrasónico (ojos) brillando al frente
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#58a6ff';
+                ctx.fillStyle = '#58a6ff';
+                ctx.fillRect(8, -6, 6, 4);
+                ctx.fillRect(8, 2, 6, 4);
+                ctx.shadowBlur = 0; // Resetear sombra para no afectar otras figuras
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+        }
+
+        function initPSO() {
+            particulas = [];
+            for (let i = 0; i < numRobots; i++) {
+                particulas.push(new RobotPSO());
+            }
+        }
+
+        canvas.addEventListener('mousedown', e => {
+            objetivo.x = e.clientX;
+            objetivo.y = e.clientY;
+            
+            // Al mover el objetivo, las memorias pasadas ya no sirven
+            particulas.forEach(p => {
+                p.pBestScore = evaluarCosto(p.pBestX, p.pBestY);
+            });
+        });
+
+        function animate() {
+            // Fondo oscuro puro para alto contraste
+            ctx.fillStyle = "rgba(13, 17, 23, 1)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Rejilla de fondo
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+            ctx.lineWidth = 1;
+            for(let i = 0; i < canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for(let i = 0; i < canvas.height; i+=100) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
+
+            // Dibujar Objetivo (Baliza)
+            ctx.beginPath();
+            ctx.arc(objetivo.x, objetivo.y, 12, 0, Math.PI * 2);
+            ctx.fillStyle = '#f85149';
+            ctx.fill();
+            
+            // Anillos de transmisión de la baliza
+            let time = Date.now() * 0.002;
+            for(let i=1; i<=3; i++) {
+                ctx.beginPath();
+                let r = 12 + ((time * 15 + (i * 20)) % 60);
+                ctx.arc(objetivo.x, objetivo.y, r, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(248, 81, 73, ${1 - (r / 72)})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // 1. Actualizar lógica matemática
+            for (let p of particulas) {
+                p.update(particulas);
+            }
+
+            // 2. Dibujar capa de comunicaciones (líneas debajo de los robots)
+            for (let p of particulas) {
+                p.drawConexiones();
+            }
+
+            // 3. Dibujar hardware (robots por encima de las líneas)
+            for (let p of particulas) {
+                p.drawRobot();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        initPSO();
+        animate();
+    </script>
+</body>
+</html>
