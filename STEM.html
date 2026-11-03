@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Actividad STEM EV3: Lógica Reactiva</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #1a1a1d;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff;
+        }
+        canvas { display: block; }
+        #ui-panel {
+            position: absolute; top: 20px; left: 20px; width: 340px;
+            background: rgba(46, 46, 56, 0.85);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+            border-radius: 12px; padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 10;
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid rgba(243, 156, 18, 0.4); padding-bottom: 10px; color: #f39c12; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: #ecf0f1; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #f39c12; }
+        .desc { font-size: 0.7rem; color: #95a5a6; display: block; margin-top: -3px; margin-bottom: 6px; }
+        
+        #stats-board {
+            margin-top: 20px; padding: 15px;
+            background: rgba(0,0,0,0.4); border-radius: 8px;
+            text-align: center; border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+        .stat-value { font-size: 2rem; color: #e74c3c; font-weight: bold; }
+        .stat-label { font-size: 0.8rem; color: #bdc3c7; text-transform: uppercase; letter-spacing: 1px;}
+        
+        button {
+            width: 100%; padding: 10px; margin-top: 15px;
+            background: #f39c12; color: #1a1a1d; border: none;
+            border-radius: 6px; font-weight: bold; cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #e67e22; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Arquitectura Reactiva EV3</h2>
+        
+        <div class="control-group">
+            <label><span>Robots en Prueba</span> <span id="val-robots">15</span></label>
+            <input type="range" id="slider-robots" min="1" max="30" value="15">
+        </div>
+
+        <div class="control-group">
+            <label><span>Rango del Ultrasónico</span> <span id="val-sensor">70px</span></label>
+            <span class="desc">Distancia umbral para activar el desvío.</span>
+            <input type="range" id="slider-sensor" min="30" max="150" value="70">
+        </div>
+
+        <div class="control-group">
+            <label><span>Velocidad de Motores</span> <span id="val-vel">2.5</span></label>
+            <input type="range" id="slider-vel" min="1" max="5" step="0.1" value="2.5">
+        </div>
+
+        <div id="stats-board">
+            <div class="stat-value" id="val-colisiones">0</div>
+            <div class="stat-label">Colisiones Registradas</div>
+        </div>
+
+        <button onclick="reiniciarPrueba()">Reiniciar Experimento</button>
+        <p style="font-size: 0.7rem; color: #95a5a6; text-align: center; margin-top: 15px;">Arrastra los círculos grises (obstáculos) o la zona meta (naranja).</p>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Parámetros
+        let numRobots = 15;
+        let sensorRange = 70;
+        let baseSpeed = 2.5;
+        let totalColisiones = 0;
+
+        document.getElementById('slider-robots').oninput = e => { numRobots = parseInt(e.target.value); document.getElementById('val-robots').innerText = numRobots; reiniciarPrueba(); };
+        document.getElementById('slider-sensor').oninput = e => { sensorRange = parseInt(e.target.value); document.getElementById('val-sensor').innerText = sensorRange + 'px'; };
+        document.getElementById('slider-vel').oninput = e => { baseSpeed = parseFloat(e.target.value); document.getElementById('val-vel').innerText = baseSpeed.toFixed(1); };
+
+        let meta = { x: canvas.width - 100, y: canvas.height / 2, radius: 40, isDragging: false };
+        let obstaculos = [];
+        let robots = [];
+        let efectosColision = [];
+
+        // Generar campo de obstáculos
+        function generarObstaculos() {
+            obstaculos = [];
+            for(let i=0; i<6; i++) {
+                obstaculos.push({
+                    x: canvas.width * 0.3 + Math.random() * (canvas.width * 0.4),
+                    y: canvas.height * 0.2 + Math.random() * (canvas.height * 0.6),
+                    radius: 30 + Math.random() * 20,
+                    isDragging: false
+                });
+            }
+        }
+
+        class RobotReactivo {
+            constructor(id) {
+                this.id = id;
+                this.radius = 12;
+                this.x = 50 + Math.random() * 100;
+                this.y = 50 + Math.random() * (canvas.height - 100);
+                this.angle = 0; // Apuntando a la derecha
+                
+                // Máquina de estados simple: 0 = Avanzar a meta, 1 = Esquivando
+                this.estado = 0;
+                this.direccionEsquive = 1; // 1 = derecha, -1 = izquierda
+                this.tiempoEsquive = 0;
+                
+                this.cooldownColision = 0; // Para no contar el mismo choque 60 veces por segundo
+            }
+
+            update(todosRobots) {
+                let colisionDetectada = false;
+                let objetoDetectado = false;
+                let distMinima = sensorRange;
+
+                // 1. Raycast Cónico Frontal (Simulación de Ultrasónico)
+                let obstaculoEnFrente = false;
+                
+                const checarRayo = (objX, objY, objRadio) => {
+                    let dx = objX - this.x;
+                    let dy = objY - this.y;
+                    let dist = Math.hypot(dx, dy) - this.radius - objRadio;
+                    
+                    if(dist < sensorRange) {
+                        let anguloHaciaObj = Math.atan2(dy, dx);
+                        let diffAngulo = this.angle - anguloHaciaObj;
+                        // Normalizar entre -PI y PI
+                        diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
+                        
+                        // Si el objeto está dentro de un cono de +/- 25 grados enfrente
+                        if(Math.abs(diffAngulo) < 0.45) {
+                            obstaculoEnFrente = true;
+                            if(dist < distMinima) distMinima = dist;
+                            // Decidir giro opuesto al lado donde detecta más masa
+                            if (this.estado === 0) {
+                                this.direccionEsquive = diffAngulo > 0 ? 1 : -1;
+                            }
+                        }
+                    }
+                };
+
+                // Checar muros (obstáculos)
+                obstaculos.forEach(obs => checarRayo(obs.x, obs.y, obs.radius));
+                // Checar otros robots
+                todosRobots.forEach(rob => {
+                    if (rob.id !== this.id) checarRayo(rob.x, rob.y, rob.radius);
+                });
+
+                // 2. Lógica Reactiva (Máquina de Estados)
+                if (obstaculoEnFrente) {
+                    this.estado = 1; // Cambiar a esquivar
+                    this.tiempoEsquive = 20; // Mantener el giro unos frames extra
+                } else if (this.tiempoEsquive > 0) {
+                    this.tiempoEsquive--;
+                } else {
+                    this.estado = 0; // Camino libre, ir a la meta
+                }
+
+                // 3. Ejecución del Movimiento
+                if (this.estado === 1) {
+                    // Girar sobre su propio eje o avanzar muy lento
+                    this.angle += 0.08 * this.direccionEsquive;
+                    this.x += Math.cos(this.angle) * (baseSpeed * 0.3);
+                    this.y += Math.sin(this.angle) * (baseSpeed * 0.3);
+                } else {
+                    // Avanzar hacia la meta corrigiendo el ángulo suavemente
+                    let anguloMeta = Math.atan2(meta.y - this.y, meta.x - this.x);
+                    let diffAngulo = this.angle - anguloMeta;
+                    diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
+                    this.angle -= diffAngulo * 0.05; // Girar progresivamente (steering)
+                    
+                    this.x += Math.cos(this.angle) * baseSpeed;
+                    this.y += Math.sin(this.angle) * baseSpeed;
+                }
+
+                // 4. Conteo de Colisiones Físicas Reales (Los empalmes)
+                if (this.cooldownColision > 0) this.cooldownColision--;
+                
+                const checarColision = (objX, objY, objRadio) => {
+                    let dist = Math.hypot(objX - this.x, objY - this.y);
+                    if (dist < this.radius + objRadio - 2) { // -2 tolerancia visual
+                        if(this.cooldownColision === 0) {
+                            totalColisiones++;
+                            document.getElementById('val-colisiones').innerText = totalColisiones;
+                            this.cooldownColision = 30; // 0.5s de invulnerabilidad para no sobrecontar
+                            // Añadir efecto visual
+                            efectosColision.push({x: this.x + (objX-this.x)/2, y: this.y + (objY-this.y)/2, life: 1.0});
+                        }
+                        // Repulsión física básica para separarlos
+                        let repX = this.x - objX; let repY = this.y - objY;
+                        this.x += (repX/dist) * 2; this.y += (repY/dist) * 2;
+                    }
+                };
+
+                obstaculos.forEach(obs => checarColision(obs.x, obs.y, obs.radius));
+                todosRobots.forEach(rob => {
+                    if (rob.id !== this.id && rob.id > this.id) checarColision(rob.x, rob.y, rob.radius); // solo contar pares 1 vez
+                });
+                
+                // Bordes
+                if(this.x < 10) this.x = 10;
+                if(this.x > canvas.width - 10) this.x = canvas.width - 10;
+                if(this.y < 10) this.y = 10;
+                if(this.y > canvas.height - 10) this.y = canvas.height - 10;
+            }
+
+            draw() {
+                // Visualizar cono del sensor ultrasónico
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.arc(this.x, this.y, sensorRange, this.angle - 0.45, this.angle + 0.45);
+                ctx.lineTo(this.x, this.y);
+                ctx.fillStyle = this.estado === 1 ? "rgba(231, 76, 60, 0.15)" : "rgba(46, 204, 113, 0.05)";
+                ctx.fill();
+
+                // Chasis Robot
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                ctx.fillStyle = '#bdc3c7';
+                ctx.fillRect(-10, -10, 20, 20); // Cuerpo EV3 cuadrado
+                
+                // Ruedas laterales
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(-8, -12, 16, 3);
+                ctx.fillRect(-8, 9, 16, 3);
+
+                // Ojos (Sensor frontal)
+                ctx.fillStyle = '#f39c12';
+                ctx.beginPath(); ctx.arc(10, -4, 3, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(10, 4, 3, 0, Math.PI*2); ctx.fill();
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+            }
+        }
+
+        function reiniciarPrueba() {
+            robots = [];
+            totalColisiones = 0;
+            document.getElementById('val-colisiones').innerText = 0;
+            efectosColision = [];
+            generarObstaculos();
+            meta.x = canvas.width - 100;
+            meta.y = canvas.height / 2;
+            for(let i=0; i<numRobots; i++) {
+                robots.push(new RobotReactivo(i));
+            }
+        }
+
+        // Interacción (Drag)
+        let objetoArrastrado = null;
+        canvas.addEventListener('mousedown', e => {
+            let mX = e.clientX; let mY = e.clientY;
+            // Checar meta
+            if(Math.hypot(mX - meta.x, mY - meta.y) <= meta.radius) {
+                objetoArrastrado = meta; return;
+            }
+            // Checar obstáculos
+            for(let obs of obstaculos) {
+                if(Math.hypot(mX - obs.x, mY - obs.y) <= obs.radius) {
+                    objetoArrastrado = obs; return;
+                }
+            }
+        });
+        canvas.addEventListener('mousemove', e => {
+            if(objetoArrastrado) {
+                objetoArrastrado.x = e.clientX;
+                objetoArrastrado.y = e.clientY;
+            }
+        });
+        window.addEventListener('mouseup', () => { objetoArrastrado = null; });
+
+        function animate() {
+            ctx.fillStyle = "#1a1a1d";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar Meta
+            ctx.beginPath();
+            ctx.arc(meta.x, meta.y, meta.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(243, 156, 18, 0.2)";
+            ctx.fill();
+            ctx.strokeStyle = "#f39c12";
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Texto en la meta
+            ctx.fillStyle = "#f39c12";
+            ctx.font = "14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("PUNTO B", meta.x, meta.y + 4);
+
+            // Dibujar Obstáculos
+            obstaculos.forEach(obs => {
+                ctx.beginPath();
+                ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
+                ctx.fillStyle = "#34495e";
+                ctx.fill();
+                ctx.strokeStyle = "#7f8c8d";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // Actualizar Robots
+            robots.forEach(r => {
+                r.update(robots);
+                r.draw();
+            });
+
+            // Dibujar destellos de colisión
+            for (let i = efectosColision.length - 1; i >= 0; i--) {
+                let ef = efectosColision[i];
+                ctx.beginPath();
+                ctx.arc(ef.x, ef.y, 10 + (1 - ef.life)*20, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(231, 76, 60, ${ef.life})`;
+                ctx.fill();
+                ef.life -= 0.05;
+                if(ef.life <= 0) efectosColision.splice(i, 1);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        reiniciarPrueba();
+        animate();
+    </script>
+</body>
+</html>
