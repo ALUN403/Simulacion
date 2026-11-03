@@ -111,14 +111,12 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Variables Globales de Control
         let numAgentes = 15;
         let numObstaculos = 3;
-        let nivelRuido = 10; // Porcentaje
+        let nivelRuido = 10;
         let flockStrength = 1.0;
         let safeDist = 40;
 
-        // Referencias UI
         document.getElementById('slider-agentes').addEventListener('input', (e) => { numAgentes = parseInt(e.target.value); document.getElementById('val-agentes').innerText = numAgentes; ajustarAgentes(); });
         document.getElementById('slider-obstaculos').addEventListener('input', (e) => { numObstaculos = parseInt(e.target.value); document.getElementById('val-obstaculos').innerText = numObstaculos; ajustarObstaculos(); });
         document.getElementById('slider-ruido').addEventListener('input', (e) => { nivelRuido = parseInt(e.target.value); document.getElementById('val-ruido').innerText = nivelRuido + '%'; });
@@ -129,10 +127,12 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
+                this.radius = 12; // Radio del cuerpo circular
                 this.vx = (Math.random() - 0.5) * 4;
                 this.vy = (Math.random() - 0.5) * 4;
                 this.maxSpeed = 3.5;
-                this.color = `hsl(${160 + Math.random() * 40}, 80%, 60%)`; // Tonos cyan/verde
+                // Genera colores brillantes aleatorios
+                this.color = `hsl(${Math.random() * 360}, 80%, 55%)`; 
             }
 
             update(agentes, obstaculos) {
@@ -148,17 +148,14 @@
                     let dy = a.y - this.y;
                     let distReal = Math.sqrt(dx*dx + dy*dy);
                     
-                    // Aplicar ruido a la medición del sensor
                     let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
                     let distPercibida = Math.max(0.1, distReal + errorMedicion);
 
-                    // 1. Distancia de Seguridad (Separación)
                     if (distPercibida < safeDist) {
                         sep.x -= (dx / distPercibida);
                         sep.y -= (dy / distPercibida);
                     }
 
-                    // 2. Cohesión y Alineación (Flocking)
                     if (distPercibida < 150) {
                         ali.x += a.vx;
                         ali.y += a.vy;
@@ -175,7 +172,6 @@
                     coh.y = (coh.y / vecinosFlock) - this.y;
                 }
 
-                // 3. Evasión de Obstáculos (Campo de Potencial)
                 for (let o of obstaculos) {
                     let dx = this.x - o.x;
                     let dy = this.y - o.y;
@@ -184,20 +180,17 @@
                     let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
                     let distPercibida = Math.max(0.1, distReal + errorMedicion);
                     
-                    let radioEfectivo = o.radius + 120; // Rango del gradiente
+                    let radioEfectivo = o.radius + 120;
                     if (distPercibida < radioEfectivo) {
-                        // Gradiente de potencial inversamente proporcional a la distancia
                         let fuerzaRepulsion = 1 - (distPercibida / radioEfectivo);
                         obsRep.x += (dx / distReal) * (fuerzaRepulsion * 8); 
                         obsRep.y += (dy / distReal) * (fuerzaRepulsion * 8);
                     }
                 }
 
-                // Integrar fuerzas
                 this.vx += (sep.x * 0.1) + (ali.x * 0.05 * flockStrength) + (coh.x * 0.01 * flockStrength) + (obsRep.x * 0.15);
                 this.vy += (sep.y * 0.1) + (ali.y * 0.05 * flockStrength) + (coh.y * 0.01 * flockStrength) + (obsRep.y * 0.15);
 
-                // Limitar velocidad máxima
                 let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
                 if (speed > this.maxSpeed) {
                     this.vx = (this.vx / speed) * this.maxSpeed;
@@ -207,7 +200,6 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Rebotar orgánicamente en los bordes
                 let margen = 30;
                 if (this.x < margen) this.vx += 0.5;
                 if (this.x > canvas.width - margen) this.vx -= 0.5;
@@ -220,22 +212,48 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(angle);
                 
-                // Dibujar agente como un triángulo/flecha
-                ctx.beginPath();
-                ctx.moveTo(12, 0); // Punta
-                ctx.lineTo(-8, 6);
-                ctx.lineTo(-4, 0); // Hendidura trasera
-                ctx.lineTo(-8, -6);
-                ctx.closePath();
+                // Configurar sombra suave[cite: 9]
+                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = -2;
+                ctx.shadowOffsetY = 4;
                 
+                // Cuerpo circular[cite: 9]
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
                 
-                // Anillo tenue mostrando la distancia de seguridad
-                ctx.beginPath();
-                ctx.arc(0, 0, safeDist, 0, Math.PI * 2);
-                ctx.strokeStyle = "rgba(102, 252, 241, 0.05)";
+                // Borde blanco grueso[cite: 9]
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
                 ctx.stroke();
+
+                // Quitar la sombra para los detalles internos
+                ctx.shadowColor = "transparent";
+
+                // Línea direccional interna (desde el centro hacia el borde frontal)[cite: 9]
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.radius, 0);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Esfera indicadora en la punta del vector[cite: 9]
+                ctx.beginPath();
+                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                
+                // Anillo tenue (solo visible si la distancia de seguridad > radio del cuerpo)
+                if(safeDist > this.radius + 5) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, safeDist, 0, Math.PI * 2);
+                    ctx.strokeStyle = "rgba(102, 252, 241, 0.05)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
             }
@@ -249,7 +267,6 @@
                 this.isDragging = false;
             }
             draw() {
-                // Núcleo del obstáculo
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.isDragging ? "rgba(255, 65, 85, 0.8)" : "rgba(197, 198, 199, 0.2)";
@@ -257,7 +274,6 @@
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
                 ctx.stroke();
 
-                // Anillos de curvas de nivel (Campo de Potencial)
                 for (let i = 1; i <= 3; i++) {
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, this.radius + (i * 40), 0, Math.PI * 2);
@@ -292,7 +308,6 @@
             while (obstaculos.length > numObstaculos) obstaculos.pop();
         }
 
-        // Interacción con ratón
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -341,7 +356,6 @@
         });
 
         function animate() {
-            // Fondo con rastro
             ctx.fillStyle = "rgba(11, 12, 16, 0.4)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
