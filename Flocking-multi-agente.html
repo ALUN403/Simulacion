@@ -127,12 +127,12 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.radius = 12; // Radio del cuerpo circular
+                this.radius = 12; 
                 this.vx = (Math.random() - 0.5) * 4;
                 this.vy = (Math.random() - 0.5) * 4;
                 this.maxSpeed = 3.5;
-                // Genera colores brillantes aleatorios
-                this.color = `hsl(${Math.random() * 360}, 80%, 55%)`; 
+                // Color azul vibrante
+                this.color = '#00a8ff'; 
             }
 
             update(agentes, obstaculos) {
@@ -212,19 +212,19 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(angle);
                 
-                // Configurar sombra suave[cite: 9]
+                // Configurar sombra suave
                 ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
                 ctx.shadowBlur = 10;
                 ctx.shadowOffsetX = -2;
                 ctx.shadowOffsetY = 4;
                 
-                // Cuerpo circular[cite: 9]
+                // Cuerpo circular
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
                 
-                // Borde blanco grueso[cite: 9]
+                // Borde blanco grueso
                 ctx.strokeStyle = "#ffffff";
                 ctx.lineWidth = 3;
                 ctx.stroke();
@@ -232,7 +232,7 @@
                 // Quitar la sombra para los detalles internos
                 ctx.shadowColor = "transparent";
 
-                // Línea direccional interna (desde el centro hacia el borde frontal)[cite: 9]
+                // Línea direccional interna
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(this.radius, 0);
@@ -240,13 +240,13 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
                 
-                // Esfera indicadora en la punta del vector[cite: 9]
+                // Esfera indicadora en la punta
                 ctx.beginPath();
                 ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
                 ctx.fillStyle = "#ffffff";
                 ctx.fill();
                 
-                // Anillo tenue (solo visible si la distancia de seguridad > radio del cuerpo)
+                // Anillo tenue de distancia de seguridad
                 if(safeDist > this.radius + 5) {
                     ctx.beginPath();
                     ctx.arc(0, 0, safeDist, 0, Math.PI * 2);
