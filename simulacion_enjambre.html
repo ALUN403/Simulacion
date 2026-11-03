@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación de Enjambre - Lógica Difusa</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            z-index: 10;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 10px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Control de Enjambre</h2>
+        
+        <div class="control-group">
+            <label><span>Robots</span> <span id="val-robots">3</span></label>
+            <input type="range" id="slider-robots" min="1" max="5" value="3">
+        </div>
+
+        <div class="control-group">
+            <label><span>Obstáculos</span> <span id="val-obstaculos">2</span></label>
+            <input type="range" id="slider-obstaculos" min="0" max="5" value="2">
+        </div>
+
+        <div class="control-group">
+            <label><span>Velocidad (x)</span> <span id="val-velocidad">1.0</span></label>
+            <input type="range" id="slider-velocidad" min="0.5" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="checkbox-group">
+            <span>Evitar colisión entre robots</span>
+            <label class="switch">
+                <input type="checkbox" id="toggle-colision" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <p style="font-size: 0.75rem; color: #aaa; margin-top: 15px;">Arrastra los obstáculos con el ratón.</p>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Configuración Global
+        let numRobots = 3;
+        let numObstaculos = 2;
+        let velMultiplicador = 1.0;
+        let evitarRobots = true;
+        
+        const safeDistance = 100; 
+
+        // Elementos UI
+        document.getElementById('slider-robots').addEventListener('input', (e) => {
+            numRobots = parseInt(e.target.value);
+            document.getElementById('val-robots').innerText = numRobots;
+            ajustarRobots();
+        });
+        document.getElementById('slider-obstaculos').addEventListener('input', (e) => {
+            numObstaculos = parseInt(e.target.value);
+            document.getElementById('val-obstaculos').innerText = numObstaculos;
+            ajustarObstaculos();
+        });
+        document.getElementById('slider-velocidad').addEventListener('input', (e) => {
+            velMultiplicador = parseFloat(e.target.value);
+            document.getElementById('val-velocidad').innerText = velMultiplicador.toFixed(1);
+        });
+        document.getElementById('toggle-colision').addEventListener('change', (e) => {
+            evitarRobots = e.target.checked;
+        });
+
+        class Robot {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 15;
+                this.angle = Math.random() * Math.PI * 2;
+                this.baseSpeed = 2;
+                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+            }
+
+            update(robots, obstaculos) {
+                let turnForce = 0;
+                let obstacleThreat = false;
+                let robotThreat = false;
+
+                // Deambular aleatorio leve
+                this.angle += (Math.random() - 0.5) * 0.1;
+
+                // 1. Fuzificación de la distancia a obstáculos
+                let minObsDist = Infinity;
+                let closestObs = null;
+                
+                for (let obs of obstaculos) {
+                    let dx = obs.x - this.x;
+                    let dy = obs.y - this.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy) - this.radius - obs.radius;
+                    
+                    if (dist < safeDistance && dist < minObsDist) {
+                        minObsDist = dist;
+                        closestObs = obs;
+                    }
+                }
+
+                if (closestObs) {
+                    obstacleThreat = true;
+                    // Inferencia: Entre más cerca, mayor la fuerza de evasión (repulsión)
+                    let urgency = 1 - (minObsDist / safeDistance);
+                    let angleToObs = Math.atan2(closestObs.y - this.y, closestObs.x - this.x);
+                    
+                    // Diferencia de ángulo
+                    let diff = this.angle - angleToObs;
+                    // Normalizar entre -PI y PI
+                    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                    
+                    // Girar en dirección opuesta
+                    if (diff > 0) turnForce += urgency * 0.1;
+                    else turnForce -= urgency * 0.1;
+                }
+
+                // 2. Fuzificación de la distancia a otros robots (si está activo)
+                if (evitarRobots) {
+                    let minRobDist = Infinity;
+                    let closestRob = null;
+                    
+                    for (let rob of robots) {
+                        if (rob === this) continue;
+                        let dx = rob.x - this.x;
+                        let dy = rob.y - this.y;
+                        let dist = Math.sqrt(dx*dx + dy*dy) - this.radius - rob.radius;
+                        
+                        if (dist < safeDistance * 0.8 && dist < minRobDist) {
+                            minRobDist = dist;
+                            closestRob = rob;
+                        }
+                    }
+
+                    if (closestRob) {
+                        robotThreat = true;
+                        let urgency = 1 - (minRobDist / (safeDistance * 0.8));
+                        let angleToRob = Math.atan2(closestRob.y - this.y, closestRob.x - this.x);
+                        let diff = this.angle - angleToRob;
+                        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                        
+                        if (diff > 0) turnForce += urgency * 0.15;
+                        else turnForce -= urgency * 0.15;
+                        
+                        // Freno difuso por cercanía crítica a compañero
+                        if(urgency > 0.8) this.speedMult = 0.5;
+                    }
+                }
+
+                this.angle += turnForce;
+
+                // Actualizar posición
+                let currentSpeed = this.baseSpeed * velMultiplicador;
+                if(obstacleThreat || robotThreat) currentSpeed *= 0.8; // Reduce velocidad al evadir
+
+                this.x += Math.cos(this.angle) * currentSpeed;
+                this.y += Math.sin(this.angle) * currentSpeed;
+
+                // Rebotar en bordes
+                if (this.x < this.radius) { this.x = this.radius; this.angle = Math.PI - this.angle; }
+                if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.angle = Math.PI - this.angle; }
+                if (this.y < this.radius) { this.y = this.radius; this.angle = -this.angle; }
+                if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.angle = -this.angle; }
+            }
+
+            draw() {
+                // Sensor de radio
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, safeDistance, 0, Math.PI * 2);
+                ctx.strokeStyle = "rgba(255,255,255,0.05)";
+                ctx.stroke();
+
+                // Cuerpo
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Vector frontal
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x + Math.cos(this.angle) * this.radius * 1.5, this.y + Math.sin(this.angle) * this.radius * 1.5);
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Indicador frontal
+                ctx.beginPath();
+                ctx.arc(this.x + Math.cos(this.angle) * this.radius * 1.5, this.y + Math.sin(this.angle) * this.radius * 1.5, 3, 0, Math.PI * 2);
+                ctx.fillStyle = "#fff";
+                ctx.fill();
+            }
+        }
+
+        class Obstaculo {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 40;
+                this.isDragging = false;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.isDragging ? "rgba(255, 100, 100, 0.4)" : "rgba(100, 100, 100, 0.4)";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Icono decorativo de drag
+                ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+                for(let i=-5; i<=5; i+=5) {
+                    for(let j=-5; j<=5; j+=5) {
+                        ctx.fillRect(this.x + i - 1, this.y + j - 1, 2, 2);
+                    }
+                }
+            }
+        }
+
+        let robots = [];
+        let obstaculos = [];
+        let draggingObstacle = null;
+
+        function init() {
+            for (let i = 0; i < numRobots; i++) {
+                robots.push(new Robot(canvas.width / 2 + (Math.random() - 0.5) * 200, canvas.height / 2 + (Math.random() - 0.5) * 200));
+            }
+            for (let i = 0; i < numObstaculos; i++) {
+                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 400, canvas.height / 2 + (Math.random() - 0.5) * 400));
+            }
+        }
+
+        function ajustarRobots() {
+            while (robots.length < numRobots) {
+                robots.push(new Robot(canvas.width / 2, canvas.height / 2));
+            }
+            while (robots.length > numRobots) {
+                robots.pop();
+            }
+        }
+
+        function ajustarObstaculos() {
+            while (obstaculos.length < numObstaculos) {
+                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 400, canvas.height / 2 + (Math.random() - 0.5) * 400));
+            }
+            while (obstaculos.length > numObstaculos) {
+                obstaculos.pop();
+            }
+        }
+
+        // Interacción con ratón para arrastrar obstáculos
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            for (let obs of obstaculos) {
+                let dx = mouseX - obs.x;
+                let dy = mouseY - obs.y;
+                if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
+                    draggingObstacle = obs;
+                    obs.isDragging = true;
+                    canvas.style.cursor = 'grabbing';
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingObstacle) {
+                const rect = canvas.getBoundingClientRect();
+                draggingObstacle.x = e.clientX - rect.left;
+                draggingObstacle.y = e.clientY - rect.top;
+            } else {
+                // Cambiar cursor si está sobre un obstáculo
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                let overObs = false;
+                for (let obs of obstaculos) {
+                    let dx = mouseX - obs.x;
+                    let dy = mouseY - obs.y;
+                    if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
+                        overObs = true;
+                        break;
+                    }
+                }
+                canvas.style.cursor = overObs ? 'grab' : 'default';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (draggingObstacle) {
+                draggingObstacle.isDragging = false;
+                draggingObstacle = null;
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        function animate() {
+            // Fondo semitransparente para efecto de estela
+            ctx.fillStyle = "rgba(18, 18, 18, 0.3)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar rejilla decorativa
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
+            ctx.lineWidth = 1;
+            for(let x=0; x<canvas.width; x+=50) {
+                ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for(let y=0; y<canvas.height; y+=50) {
+                ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Actualizar y dibujar
+            for (let obs of obstaculos) {
+                obs.draw();
+            }
+            
+            for (let i=0; i<robots.length; i++) {
+                robots[i].update(robots, obstaculos);
+                robots[i].draw();
+                
+                // Dibujar línea de repulsión mutua si están muy cerca
+                if (evitarRobots) {
+                    for (let j=i+1; j<robots.length; j++) {
+                        let dx = robots[i].x - robots[j].x;
+                        let dy = robots[i].y - robots[j].y;
+                        let dist = Math.sqrt(dx*dx + dy*dy);
+                        if(dist < safeDistance * 0.8) {
+                            ctx.beginPath();
+                            ctx.moveTo(robots[i].x, robots[i].y);
+                            ctx.lineTo(robots[j].x, robots[j].y);
+                            ctx.strokeStyle = `rgba(255, 50, 50, ${1 - (dist/(safeDistance*0.8))})`;
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
