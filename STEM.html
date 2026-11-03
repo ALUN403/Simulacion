@@ -69,7 +69,7 @@
         </div>
 
         <button onclick="reiniciarPrueba()">Reiniciar Experimento</button>
-        <p style="font-size: 0.7rem; color: #95a5a6; text-align: center; margin-top: 15px;">Arrastra los círculos grises (obstáculos) o la zona meta (naranja).</p>
+        <p style="font-size: 0.7rem; color: #95a5a6; text-align: center; margin-top: 15px;">Arrastra los círculos (obstáculos) o la zona meta (naranja).</p>
     </div>
 
     <canvas id="simCanvas"></canvas>
@@ -81,7 +81,6 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Parámetros
         let numRobots = 15;
         let sensorRange = 70;
         let baseSpeed = 2.5;
@@ -96,7 +95,6 @@
         let robots = [];
         let efectosColision = [];
 
-        // Generar campo de obstáculos
         function generarObstaculos() {
             obstaculos = [];
             for(let i=0; i<6; i++) {
@@ -112,26 +110,24 @@
         class RobotReactivo {
             constructor(id) {
                 this.id = id;
-                this.radius = 12;
+                this.radius = 12; // Radio actualizado para el nuevo diseño circular
                 this.x = 50 + Math.random() * 100;
                 this.y = 50 + Math.random() * (canvas.height - 100);
-                this.angle = 0; // Apuntando a la derecha
+                this.angle = 0; 
                 
-                // Máquina de estados simple: 0 = Avanzar a meta, 1 = Esquivando
                 this.estado = 0;
-                this.direccionEsquive = 1; // 1 = derecha, -1 = izquierda
+                this.direccionEsquive = 1; 
                 this.tiempoEsquive = 0;
                 
-                this.cooldownColision = 0; // Para no contar el mismo choque 60 veces por segundo
+                this.cooldownColision = 0; 
+                
+                // Color similar al que pasaste de ejemplo (un magenta vibrante)
+                this.color = '#e84393'; 
             }
 
             update(todosRobots) {
-                let colisionDetectada = false;
-                let objetoDetectado = false;
-                let distMinima = sensorRange;
-
-                // 1. Raycast Cónico Frontal (Simulación de Ultrasónico)
                 let obstaculoEnFrente = false;
+                let distMinima = sensorRange;
                 
                 const checarRayo = (objX, objY, objRadio) => {
                     let dx = objX - this.x;
@@ -141,14 +137,11 @@
                     if(dist < sensorRange) {
                         let anguloHaciaObj = Math.atan2(dy, dx);
                         let diffAngulo = this.angle - anguloHaciaObj;
-                        // Normalizar entre -PI y PI
                         diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
                         
-                        // Si el objeto está dentro de un cono de +/- 25 grados enfrente
                         if(Math.abs(diffAngulo) < 0.45) {
                             obstaculoEnFrente = true;
                             if(dist < distMinima) distMinima = dist;
-                            // Decidir giro opuesto al lado donde detecta más masa
                             if (this.estado === 0) {
                                 this.direccionEsquive = diffAngulo > 0 ? 1 : -1;
                             }
@@ -156,54 +149,45 @@
                     }
                 };
 
-                // Checar muros (obstáculos)
                 obstaculos.forEach(obs => checarRayo(obs.x, obs.y, obs.radius));
-                // Checar otros robots
                 todosRobots.forEach(rob => {
                     if (rob.id !== this.id) checarRayo(rob.x, rob.y, rob.radius);
                 });
 
-                // 2. Lógica Reactiva (Máquina de Estados)
                 if (obstaculoEnFrente) {
-                    this.estado = 1; // Cambiar a esquivar
-                    this.tiempoEsquive = 20; // Mantener el giro unos frames extra
+                    this.estado = 1; 
+                    this.tiempoEsquive = 20; 
                 } else if (this.tiempoEsquive > 0) {
                     this.tiempoEsquive--;
                 } else {
-                    this.estado = 0; // Camino libre, ir a la meta
+                    this.estado = 0; 
                 }
 
-                // 3. Ejecución del Movimiento
                 if (this.estado === 1) {
-                    // Girar sobre su propio eje o avanzar muy lento
                     this.angle += 0.08 * this.direccionEsquive;
                     this.x += Math.cos(this.angle) * (baseSpeed * 0.3);
                     this.y += Math.sin(this.angle) * (baseSpeed * 0.3);
                 } else {
-                    // Avanzar hacia la meta corrigiendo el ángulo suavemente
                     let anguloMeta = Math.atan2(meta.y - this.y, meta.x - this.x);
                     let diffAngulo = this.angle - anguloMeta;
                     diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
-                    this.angle -= diffAngulo * 0.05; // Girar progresivamente (steering)
+                    this.angle -= diffAngulo * 0.05; 
                     
                     this.x += Math.cos(this.angle) * baseSpeed;
                     this.y += Math.sin(this.angle) * baseSpeed;
                 }
 
-                // 4. Conteo de Colisiones Físicas Reales (Los empalmes)
                 if (this.cooldownColision > 0) this.cooldownColision--;
                 
                 const checarColision = (objX, objY, objRadio) => {
                     let dist = Math.hypot(objX - this.x, objY - this.y);
-                    if (dist < this.radius + objRadio - 2) { // -2 tolerancia visual
+                    if (dist < this.radius + objRadio - 2) { 
                         if(this.cooldownColision === 0) {
                             totalColisiones++;
                             document.getElementById('val-colisiones').innerText = totalColisiones;
-                            this.cooldownColision = 30; // 0.5s de invulnerabilidad para no sobrecontar
-                            // Añadir efecto visual
+                            this.cooldownColision = 30; 
                             efectosColision.push({x: this.x + (objX-this.x)/2, y: this.y + (objY-this.y)/2, life: 1.0});
                         }
-                        // Repulsión física básica para separarlos
                         let repX = this.x - objX; let repY = this.y - objY;
                         this.x += (repX/dist) * 2; this.y += (repY/dist) * 2;
                     }
@@ -211,10 +195,9 @@
 
                 obstaculos.forEach(obs => checarColision(obs.x, obs.y, obs.radius));
                 todosRobots.forEach(rob => {
-                    if (rob.id !== this.id && rob.id > this.id) checarColision(rob.x, rob.y, rob.radius); // solo contar pares 1 vez
+                    if (rob.id !== this.id && rob.id > this.id) checarColision(rob.x, rob.y, rob.radius); 
                 });
                 
-                // Bordes
                 if(this.x < 10) this.x = 10;
                 if(this.x > canvas.width - 10) this.x = canvas.width - 10;
                 if(this.y < 10) this.y = 10;
@@ -230,22 +213,42 @@
                 ctx.fillStyle = this.estado === 1 ? "rgba(231, 76, 60, 0.15)" : "rgba(46, 204, 113, 0.05)";
                 ctx.fill();
 
-                // Chasis Robot
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
                 
-                ctx.fillStyle = '#bdc3c7';
-                ctx.fillRect(-10, -10, 20, 20); // Cuerpo EV3 cuadrado
+                // Configurar sombra suave
+                ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = -2;
+                ctx.shadowOffsetY = 3;
                 
-                // Ruedas laterales
-                ctx.fillStyle = '#2c3e50';
-                ctx.fillRect(-8, -12, 16, 3);
-                ctx.fillRect(-8, 9, 16, 3);
+                // Cuerpo circular
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Borde blanco grueso
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
 
-                // Ojos (Sensor frontal)
-                ctx.fillStyle = '#f39c12';
-                ctx.beginPath(); ctx.arc(10, -4, 3, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(10, 4, 3, 0, Math.PI*2); ctx.fill();
+                // Quitar la sombra para los detalles internos
+                ctx.shadowColor = "transparent";
+
+                // Línea direccional interna
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.radius, 0);
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // Esfera indicadora (antena) en la punta del vector
+                ctx.beginPath();
+                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
             }
@@ -264,15 +267,12 @@
             }
         }
 
-        // Interacción (Drag)
         let objetoArrastrado = null;
         canvas.addEventListener('mousedown', e => {
             let mX = e.clientX; let mY = e.clientY;
-            // Checar meta
             if(Math.hypot(mX - meta.x, mY - meta.y) <= meta.radius) {
                 objetoArrastrado = meta; return;
             }
-            // Checar obstáculos
             for(let obs of obstaculos) {
                 if(Math.hypot(mX - obs.x, mY - obs.y) <= obs.radius) {
                     objetoArrastrado = obs; return;
@@ -302,7 +302,6 @@
             ctx.stroke();
             ctx.setLineDash([]);
             
-            // Texto en la meta
             ctx.fillStyle = "#f39c12";
             ctx.font = "14px sans-serif";
             ctx.textAlign = "center";
@@ -312,9 +311,9 @@
             obstaculos.forEach(obs => {
                 ctx.beginPath();
                 ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
-                ctx.fillStyle = "#34495e";
+                ctx.fillStyle = "#2c3e50";
                 ctx.fill();
-                ctx.strokeStyle = "#7f8c8d";
+                ctx.strokeStyle = "#95a5a6";
                 ctx.lineWidth = 2;
                 ctx.stroke();
             });
