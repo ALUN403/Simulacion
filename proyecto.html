@@ -1,470 +1,966 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulación de Enjambre - Lógica Difusa</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #121212;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #fff;
-        }
-        canvas {
-            display: block;
-        }
-        #ui-panel {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 320px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            z-index: 10;
-        }
-        h2 {
-            margin-top: 0;
-            font-size: 1.2rem;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding-bottom: 10px;
-        }
-        .control-group {
-            margin-bottom: 15px;
-        }
-        .control-group label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-        }
-        input[type="range"] {
-            width: 100%;
-            cursor: pointer;
-        }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.9rem;
-            margin-top: 20px;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 40px;
-            height: 20px;
-        }
-        .switch input { 
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #555;
-            transition: .4s;
-            border-radius: 20px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 14px;
-            width: 14px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #2196F3;
-        }
-        input:checked + .slider:before {
-            transform: translateX(20px);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lógica Difusa en Enjambres: Navegación Aleatoria y Ruta Opcional</title>
+  <style>
+    :root {
+      --bg-main: #0b0c0e;
+      --bg-card: #15171a;
+      --bg-panel: #101215;
+      --border-subtle: #26292e;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --obstacle: #f87171;
+      --waypoint: #34d399;
+      --accent: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      background-color: #1c1f24;
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #252930;
+    }
+
+    button.active {
+      background-color: #172554;
+      border-color: var(--accent);
+      color: #93c5fd;
+    }
+
+    button.route-btn:not(:disabled) {
+      background-color: #064e3b;
+      border-color: #10b981;
+      color: #a7f3d0;
+    }
+
+    button.route-btn:hover:not(:disabled) {
+      background-color: #065f46;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .arena-wrapper {
+      position: relative;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 450px;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .robots-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 720px) {
+      .robots-grid {
+        grid-template-columns: 1fr;
+      }
+      canvas {
+        height: 360px;
+      }
+    }
+
+    .robot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .robot-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background-color: #1f242c;
+      color: #d1d5db;
+      border: 1px solid #323842;
+    }
+
+    .pill.evade {
+      background-color: #451a03;
+      color: #fbbf24;
+      border-color: #d9770666;
+    }
+
+    .pill.sync {
+      background-color: #064e3b;
+      color: #34d399;
+      border-color: #05966966;
+    }
+
+    .pill.random {
+      background-color: #1e1b4b;
+      color: #c4b5fd;
+      border-color: #7c3aed66;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      font-size: 0.78rem;
+      margin-bottom: 10px;
+    }
+
+    .metric-box {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 7px 9px;
+    }
+
+    .metric-box span {
+      display: block;
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+
+    .metric-box strong {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.84rem;
+    }
+
+    .rules-mini {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      font-size: 0.74rem;
+    }
+
+    .rule-tag {
+      background-color: #181b20;
+      border: 1px solid #282c34;
+      border-radius: 6px;
+      padding: 5px 8px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rule-tag.active {
+      background-color: #13254b;
+      border-color: #3b82f6;
+      color: #bfdbfe;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Enjambre con Lógica Difusa: Exploración Aleatoria y Ruta</h1>
+        <p>Los robots inician explorando aleatoriamente sin colisiones. Pulsa <strong>Agregar Ruta</strong> para asignarles un recorrido editable.</p>
+      </div>
+      <div class="toolbar">
+        <button id="btn-add-robot">+ Robot (<span id="robot-count">2</span>/5)</button>
+        <button id="btn-add-route" class="route-btn">Agregar Ruta</button>
+        <button id="btn-mode-obs" class="active">+ Obstáculo (Clic)</button>
+        <button id="btn-clear-obs">Limpiar Obstáculos</button>
+        <button id="btn-reset">Reiniciar</button>
+      </div>
+    </header>
 
-    <div id="ui-panel">
-        <h2>Control de Enjambre</h2>
-        
-        <div class="control-group">
-            <label><span>Robots</span> <span id="val-robots">3</span></label>
-            <input type="range" id="slider-robots" min="1" max="5" value="3">
-        </div>
-
-        <div class="control-group">
-            <label><span>Obstáculos</span> <span id="val-obstaculos">2</span></label>
-            <input type="range" id="slider-obstaculos" min="1" max="10" value="2">
-        </div>
-
-        <div class="control-group">
-            <label><span>Velocidad (x)</span> <span id="val-velocidad">1.0</span></label>
-            <input type="range" id="slider-velocidad" min="0.5" max="3.0" step="0.1" value="1.0">
-        </div>
-
-        <div class="checkbox-group">
-            <span>Evitar colisión entre robots</span>
-            <label class="switch">
-                <input type="checkbox" id="toggle-colision" checked>
-                <span class="slider"></span>
-            </label>
-        </div>
-        <p style="font-size: 0.75rem; color: #aaa; margin-top: 15px;">Arrastra los obstáculos con el ratón.</p>
+    <div class="card">
+      <div class="arena-wrapper">
+        <canvas id="swarmCanvas" width="1000" height="450"></canvas>
+      </div>
+      <div id="legend" class="legend"></div>
     </div>
 
-    <canvas id="simCanvas"></canvas>
+    <div id="robots-grid" class="robots-grid"></div>
+  </div>
 
-    <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
+  <script>
+    const canvas = document.getElementById("swarmCanvas");
+    const ctx = canvas.getContext("2d");
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+    const MAX_ROBOTS = 5;
+    const INITIAL_ROBOTS = 2;
+
+    const ROBOT_PALETTE = [
+      "#38bdf8", // Robot 1 - Azul cielo
+      "#a78bfa", // Robot 2 - Violeta
+      "#f59e0b", // Robot 3 - Ámbar
+      "#ec4899", // Robot 4 - Rosa
+      "#2dd4bf"  // Robot 5 - Turquesa
+    ];
+
+    let addObstacleOnClick = true;
+    let dragTarget = null;
+    let hoverTarget = null;
+
+    let waypoints = [];
+    let obstacles = [];
+    let robots = [];
+
+    function createRoute() {
+      return [
+        { x: 250, y: 125 },
+        { x: 500, y: 125 },
+        { x: 750, y: 155 },
+        { x: 780, y: 325 },
+        { x: 500, y: 335 },
+        { x: 240, y: 315 }
+      ];
+    }
+
+    function makeRobot(index, sharedWpIndex = 0) {
+      const slot = index - ((MAX_ROBOTS - 1) / 2);
+      const startX = 220 + index * 120;
+      const startY = 180 + (index % 2) * 90;
+      const initAngle = (index * 1.35) + (Math.random() - 0.5) * 0.6;
+
+      return {
+        id: `r${index + 1}`,
+        name: `Robot ${index + 1}`,
+        color: ROBOT_PALETTE[index % ROBOT_PALETTE.length],
+        x: Math.min(canvas.width - 130, startX),
+        y: startY,
+        vx: 0,
+        vy: 0,
+        angle: initAngle,
+        wanderAngle: initAngle,
+        wanderTimer: 0.3 + Math.random() * 0.7,
+        wpIndex: sharedWpIndex,
+        formationOffset: slot * 22,
+        trail: [],
+        fuzzy: { wall: 0, peer: 0, obs: 0, modeWeight: 1, evading: false }
+      };
+    }
+
+    function syncToolbarButtons() {
+      const countLabel = document.getElementById("robot-count");
+      const btnAddRobot = document.getElementById("btn-add-robot");
+      const btnAddRoute = document.getElementById("btn-add-route");
+
+      countLabel.textContent = String(robots.length);
+      btnAddRobot.disabled = robots.length >= MAX_ROBOTS;
+      btnAddRoute.disabled = waypoints.length > 0;
+    }
+
+    function rebuildRobotUI() {
+      const grid = document.getElementById("robots-grid");
+      const legend = document.getElementById("legend");
+      syncToolbarButtons();
+
+      legend.innerHTML = "";
+      robots.forEach((r) => {
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `<span class="dot" style="background:${r.color};"></span> ${r.name}`;
+        legend.appendChild(item);
+      });
+
+      if (waypoints.length > 0) {
+        const wpLegend = document.createElement("div");
+        wpLegend.className = "legend-item";
+        wpLegend.innerHTML = `<span class="dot" style="background:#34d399;"></span> Puntos de Ruta (arrastrables)`;
+        legend.appendChild(wpLegend);
+      }
+
+      const obsLegend = document.createElement("div");
+      obsLegend.className = "legend-item";
+      obsLegend.innerHTML = `<span class="dot" style="background:#f87171;"></span> Obstáculos (clic o arrastrar)`;
+      legend.appendChild(obsLegend);
+
+      const wallLegend = document.createElement("div");
+      wallLegend.className = "legend-item";
+      wallLegend.innerHTML = `<span>Perímetro: Pared con evasión difusa</span>`;
+      legend.appendChild(wallLegend);
+
+      grid.innerHTML = "";
+      robots.forEach((r) => {
+        const hasRoute = waypoints.length > 0;
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="robot-header">
+            <div class="robot-title"><span class="dot" style="background:${r.color};"></span> ${r.name}</div>
+            <span id="badge-${r.id}" class="pill ${hasRoute ? "sync" : "random"}">${hasRoute ? "Siguiendo Ruta" : "Aleatorio"}</span>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-box"><span id="lbl-mode-${r.id}">${hasRoute ? "Ruta WP" : "Modo"}</span><strong id="wp-${r.id}">${hasRoute ? "WP 1" : "Exploración"}</strong></div>
+            <div class="metric-box"><span>Pared</span><strong id="wall-${r.id}">0.00</strong></div>
+            <div class="metric-box"><span>Enjambre</span><strong id="peer-${r.id}">0.00</strong></div>
+            <div class="metric-box"><span>Obstáculo</span><strong id="obs-${r.id}">0.00</strong></div>
+          </div>
+          <div class="rules-mini">
+            <div id="${r.id}-f1" class="rule-tag"><span>F1: Esquivar Pared</span><strong id="${r.id}-w1">0.00</strong></div>
+            <div id="${r.id}-f2" class="rule-tag"><span>F2: Evitar Enjambre</span><strong id="${r.id}-w2">0.00</strong></div>
+            <div id="${r.id}-f3" class="rule-tag"><span>F3: Esquivar Obstáculo</span><strong id="${r.id}-w3">0.00</strong></div>
+            <div id="${r.id}-f4" class="rule-tag active"><span id="${r.id}-l4">${hasRoute ? "F4: Sincronía y Ruta" : "F4: Rumbo Aleatorio"}</span><strong id="${r.id}-w4">1.00</strong></div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function initSimulation() {
+      // Inicia SIN ruta (navegación aleatoria) y SIN obstáculos
+      waypoints = [];
+      obstacles = [];
+      robots = [];
+      for (let i = 0; i < INITIAL_ROBOTS; i++) {
+        robots.push(makeRobot(i, 0));
+      }
+      rebuildRobotUI();
+    }
+
+    function addRobotToSwarm() {
+      if (robots.length >= MAX_ROBOTS) return;
+      const sharedWp = robots[0] ? robots[0].wpIndex : 0;
+      const newIndex = robots.length;
+      robots.push(makeRobot(newIndex, sharedWp));
+      rebuildRobotUI();
+    }
+
+    function addRouteToSwarm() {
+      if (waypoints.length > 0) return;
+      waypoints = createRoute();
+
+      // Asignar el waypoint más cercano al primer robot para transición fluida
+      let nearestIdx = 0;
+      let minDist = Infinity;
+      if (robots[0]) {
+        waypoints.forEach((wp, i) => {
+          const d = Math.hypot(wp.x - robots[0].x, wp.y - robots[0].y);
+          if (d < minDist) {
+            minDist = d;
+            nearestIdx = i;
+          }
+        });
+      }
+
+      robots.forEach((r) => {
+        r.wpIndex = nearestIdx;
+      });
+      rebuildRobotUI();
+    }
+
+    function trapmf(x, a, b, c, d) {
+      if (x <= a || x >= d) return 0;
+      if (x >= b && x <= c) return 1;
+      if (x > a && x < b) return (x - a) / (b - a);
+      return (d - x) / (d - c);
+    }
+
+    function evaluateFuzzyController(robot, allRobots, targetWp, dt) {
+      const wallMargin = 78;
+      const dLeft = robot.x;
+      const dRight = canvas.width - robot.x;
+      const dTop = robot.y;
+      const dBottom = canvas.height - robot.y;
+
+      // 1. Evasión difusa de pared
+      const muWallLeft = trapmf(wallMargin - dLeft, 6, 30, wallMargin, wallMargin + 18);
+      const muWallRight = trapmf(wallMargin - dRight, 6, 30, wallMargin, wallMargin + 18);
+      const muWallTop = trapmf(wallMargin - dTop, 6, 30, wallMargin, wallMargin + 18);
+      const muWallBottom = trapmf(wallMargin - dBottom, 6, 30, wallMargin, wallMargin + 18);
+      const muWall = Math.min(1, Math.max(muWallLeft, muWallRight, muWallTop, muWallBottom));
+
+      let wallForceX = 0;
+      let wallForceY = 0;
+      if (muWallLeft > 0) wallForceX += muWallLeft * 520;
+      if (muWallRight > 0) wallForceX -= muWallRight * 520;
+      if (muWallTop > 0) wallForceY += muWallTop * 520;
+      if (muWallBottom > 0) wallForceY -= muWallBottom * 520;
+
+      // 2. Evasión difusa entre robots del enjambre
+      let muPeer = 0;
+      let peerForceX = 0;
+      let peerForceY = 0;
+      const safePeerDist = 66;
+
+      for (const other of allRobots) {
+        if (other.id === robot.id) continue;
+        const dx = robot.x - other.x;
+        const dy = robot.y - other.y;
+        const dist = Math.hypot(dx, dy);
+        const dangerPeer = trapmf(safePeerDist - dist, 6, 24, safePeerDist, safePeerDist + 18);
+        if (dangerPeer > muPeer) muPeer = dangerPeer;
+
+        if (dangerPeer > 0 && dist > 0.001) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          peerForceX += nx * Math.pow(dangerPeer, 1.3) * 380;
+          peerForceY += ny * Math.pow(dangerPeer, 1.3) * 380;
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+      }
 
-        // Configuración Global
-        let numRobots = 3;
-        let numObstaculos = 2;
-        let velMultiplicador = 1.0;
-        let evitarRobots = true;
-        
-        const safeDistance = 100; 
+      // 3. Evasión difusa de obstáculos
+      let muObs = 0;
+      let obsForceX = 0;
+      let obsForceY = 0;
+      const robotIdx = parseInt(robot.id.slice(1), 10) || 1;
 
-        // Elementos UI
-        document.getElementById('slider-robots').addEventListener('input', (e) => {
-            numRobots = parseInt(e.target.value);
-            document.getElementById('val-robots').innerText = numRobots;
-            ajustarRobots();
-        });
-        document.getElementById('slider-obstaculos').addEventListener('input', (e) => {
-            numObstaculos = parseInt(e.target.value);
-            document.getElementById('val-obstaculos').innerText = numObstaculos;
-            ajustarObstaculos();
-        });
-        document.getElementById('slider-velocidad').addEventListener('input', (e) => {
-            velMultiplicador = parseFloat(e.target.value);
-            document.getElementById('val-velocidad').innerText = velMultiplicador.toFixed(1);
-        });
-        document.getElementById('toggle-colision').addEventListener('change', (e) => {
-            evitarRobots = e.target.checked;
-        });
+      for (const obs of obstacles) {
+        const dxObs = robot.x - obs.x;
+        const dyObs = robot.y - obs.y;
+        const distObs = Math.hypot(dxObs, dyObs);
+        const influenceRadius = obs.r + 80;
+        const danger = trapmf(influenceRadius - distObs, 6, 30, influenceRadius, influenceRadius + 20);
 
-        class Robot {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 15;
-                this.angle = Math.random() * Math.PI * 2;
-                this.baseSpeed = 2;
-                this.color = '#00a8ff'; // Color unificado a azul vibrante
-            }
+        if (danger > muObs) muObs = danger;
 
-            update(robots, obstaculos) {
-                let turnForce = 0;
-                let obstacleThreat = false;
-                let robotThreat = false;
-
-                // Deambular aleatorio leve
-                this.angle += (Math.random() - 0.5) * 0.1;
-
-                // 1. Fuzificación de la distancia a obstáculos
-                let minObsDist = Infinity;
-                let closestObs = null;
-                
-                for (let obs of obstaculos) {
-                    let dx = obs.x - this.x;
-                    let dy = obs.y - this.y;
-                    let dist = Math.sqrt(dx*dx + dy*dy) - this.radius - obs.radius;
-                    
-                    if (dist < safeDistance && dist < minObsDist) {
-                        minObsDist = dist;
-                        closestObs = obs;
-                    }
-                }
-
-                if (closestObs) {
-                    obstacleThreat = true;
-                    // Inferencia: Entre más cerca, mayor la fuerza de evasión (repulsión)
-                    let urgency = 1 - (minObsDist / safeDistance);
-                    let angleToObs = Math.atan2(closestObs.y - this.y, closestObs.x - this.x);
-                    
-                    // Diferencia de ángulo
-                    let diff = this.angle - angleToObs;
-                    // Normalizar entre -PI y PI
-                    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-                    
-                    // Girar en dirección opuesta
-                    if (diff > 0) turnForce += urgency * 0.1;
-                    else turnForce -= urgency * 0.1;
-                }
-
-                // 2. Fuzificación de la distancia a otros robots (si está activo)
-                if (evitarRobots) {
-                    let minRobDist = Infinity;
-                    let closestRob = null;
-                    
-                    for (let rob of robots) {
-                        if (rob === this) continue;
-                        let dx = rob.x - this.x;
-                        let dy = rob.y - this.y;
-                        let dist = Math.sqrt(dx*dx + dy*dy) - this.radius - rob.radius;
-                        
-                        if (dist < safeDistance * 0.8 && dist < minRobDist) {
-                            minRobDist = dist;
-                            closestRob = rob;
-                        }
-                    }
-
-                    if (closestRob) {
-                        robotThreat = true;
-                        let urgency = 1 - (minRobDist / (safeDistance * 0.8));
-                        let angleToRob = Math.atan2(closestRob.y - this.y, closestRob.x - this.x);
-                        let diff = this.angle - angleToRob;
-                        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-                        
-                        if (diff > 0) turnForce += urgency * 0.15;
-                        else turnForce -= urgency * 0.15;
-                        
-                        // Freno difuso por cercanía crítica a compañero
-                        if(urgency > 0.8) this.speedMult = 0.5;
-                    }
-                }
-
-                this.angle += turnForce;
-
-                // Actualizar posición
-                let currentSpeed = this.baseSpeed * velMultiplicador;
-                if(obstacleThreat || robotThreat) currentSpeed *= 0.8; // Reduce velocidad al evadir
-
-                this.x += Math.cos(this.angle) * currentSpeed;
-                this.y += Math.sin(this.angle) * currentSpeed;
-
-                // Rebotar en bordes
-                if (this.x < this.radius) { this.x = this.radius; this.angle = Math.PI - this.angle; }
-                if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.angle = Math.PI - this.angle; }
-                if (this.y < this.radius) { this.y = this.radius; this.angle = -this.angle; }
-                if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.angle = -this.angle; }
-            }
-
-            draw() {
-                // Sensor de radio (línea tenue alrededor del agente)
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, safeDistance, 0, Math.PI * 2);
-                ctx.strokeStyle = "rgba(255,255,255,0.05)";
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.angle);
-
-                // Configurar sombra suave
-                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-                ctx.shadowBlur = 10;
-                ctx.shadowOffsetX = -2;
-                ctx.shadowOffsetY = 4;
-                
-                // Cuerpo circular
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-                
-                // Borde blanco grueso
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
-                // Quitar la sombra para los detalles internos
-                ctx.shadowColor = "transparent";
-
-                // Línea direccional interna
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(this.radius, 0);
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // Esfera indicadora en la punta del vector
-                ctx.beginPath();
-                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-            }
+        if (danger > 0 && distObs > 0.001) {
+          const nx = dxObs / distObs;
+          const ny = dyObs / distObs;
+          const sign = robotIdx % 2 === 1 ? 1 : -1;
+          const tx = -ny * sign;
+          const ty = nx * sign;
+          const mag = Math.pow(danger, 1.3) * 500;
+          obsForceX += (nx * 0.85 + tx * 0.52) * mag;
+          obsForceY += (ny * 0.85 + ty * 0.52) * mag;
         }
+      }
 
-        class Obstaculo {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 40;
-                this.isDragging = false;
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.isDragging ? "rgba(255, 100, 100, 0.4)" : "rgba(100, 100, 100, 0.4)";
-                ctx.fill();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Icono decorativo de drag
-                ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-                for(let i=-5; i<=5; i+=5) {
-                    for(let j=-5; j<=5; j+=5) {
-                        ctx.fillRect(this.x + i - 1, this.y + j - 1, 2, 2);
-                    }
-                }
-            }
+      const maxRisk = Math.max(muWall, muPeer, muObs);
+      const baseCruise = 132;
+      const riskScale = Math.max(0.2, 1 - maxRisk * 0.65);
+
+      let navForceX = 0;
+      let navForceY = 0;
+
+      if (targetWp) {
+        // 4B. Seguimiento sincronizado de la ruta agregada
+        const toWpX = targetWp.x - robot.x;
+        const toWpY = targetWp.y - robot.y;
+        const distWp = Math.hypot(toWpX, toWpY);
+        const dirX = distWp > 0.001 ? toWpX / distWp : 0;
+        const dirY = distWp > 0.001 ? toWpY / distWp : 0;
+        const perpX = -dirY;
+        const perpY = dirX;
+
+        const goalX = targetWp.x + perpX * robot.formationOffset;
+        const goalY = targetWp.y + perpY * robot.formationOffset;
+        const gdx = goalX - robot.x;
+        const gdy = goalY - robot.y;
+        const gDist = Math.hypot(gdx, gdy);
+
+        navForceX = gDist > 0.001 ? (gdx / gDist) * baseCruise * riskScale : 0;
+        navForceY = gDist > 0.001 ? (gdy / gDist) * baseCruise * riskScale : 0;
+
+        if (allRobots.length > 1 && maxRisk < 0.25) {
+          const avgAlong =
+            allRobots.reduce((acc, r) => acc + (r.x - robot.x) * dirX + (r.y - robot.y) * dirY, 0) /
+            allRobots.length;
+          if (Math.abs(avgAlong) > 25) {
+            navForceX += dirX * Math.sign(avgAlong) * 24;
+            navForceY += dirY * Math.sign(avgAlong) * 24;
+          }
         }
-
-        let robots = [];
-        let obstaculos = [];
-        let draggingObstacle = null;
-
-        function init() {
-            for (let i = 0; i < numRobots; i++) {
-                robots.push(new Robot(canvas.width / 2 + (Math.random() - 0.5) * 200, canvas.height / 2 + (Math.random() - 0.5) * 200));
-            }
-            for (let i = 0; i < numObstaculos; i++) {
-                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 400, canvas.height / 2 + (Math.random() - 0.5) * 400));
-            }
-        }
-
-        function ajustarRobots() {
-            while (robots.length < numRobots) {
-                robots.push(new Robot(canvas.width / 2, canvas.height / 2));
-            }
-            while (robots.length > numRobots) {
-                robots.pop();
-            }
-        }
-
-        function ajustarObstaculos() {
-            while (obstaculos.length < numObstaculos) {
-                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 400, canvas.height / 2 + (Math.random() - 0.5) * 400));
-            }
-            while (obstaculos.length > numObstaculos) {
-                obstaculos.pop();
-            }
-        }
-
-        // Interacción con ratón para arrastrar obstáculos
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            for (let obs of obstaculos) {
-                let dx = mouseX - obs.x;
-                let dy = mouseY - obs.y;
-                if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
-                    draggingObstacle = obs;
-                    obs.isDragging = true;
-                    canvas.style.cursor = 'grabbing';
-                    break;
-                }
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (draggingObstacle) {
-                const rect = canvas.getBoundingClientRect();
-                draggingObstacle.x = e.clientX - rect.left;
-                draggingObstacle.y = e.clientY - rect.top;
-            } else {
-                // Cambiar cursor si está sobre un obstáculo
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                let overObs = false;
-                for (let obs of obstaculos) {
-                    let dx = mouseX - obs.x;
-                    let dy = mouseY - obs.y;
-                    if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
-                        overObs = true;
-                        break;
-                    }
-                }
-                canvas.style.cursor = overObs ? 'grab' : 'default';
-            }
-        });
-
-        window.addEventListener('mouseup', () => {
-            if (draggingObstacle) {
-                draggingObstacle.isDragging = false;
-                draggingObstacle = null;
-                canvas.style.cursor = 'default';
-            }
-        });
-
-        function animate() {
-            // Fondo semitransparente para efecto de estela
-            ctx.fillStyle = "rgba(18, 18, 18, 0.3)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Dibujar rejilla decorativa
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
-            ctx.lineWidth = 1;
-            for(let x=0; x<canvas.width; x+=50) {
-                ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke();
-            }
-            for(let y=0; y<canvas.height; y+=50) {
-                ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke();
-            }
-
-            // Actualizar y dibujar
-            for (let obs of obstaculos) {
-                obs.draw();
-            }
-            
-            for (let i=0; i<robots.length; i++) {
-                robots[i].update(robots, obstaculos);
-                robots[i].draw();
-                
-                // Dibujar línea de repulsión mutua si están muy cerca
-                if (evitarRobots) {
-                    for (let j=i+1; j<robots.length; j++) {
-                        let dx = robots[i].x - robots[j].x;
-                        let dy = robots[i].y - robots[j].y;
-                        let dist = Math.sqrt(dx*dx + dy*dy);
-                        if(dist < safeDistance * 0.8) {
-                            ctx.beginPath();
-                            ctx.moveTo(robots[i].x, robots[i].y);
-                            ctx.lineTo(robots[j].x, robots[j].y);
-                            ctx.strokeStyle = `rgba(255, 50, 50, ${1 - (dist/(safeDistance*0.8))})`;
-                            ctx.lineWidth = 2;
-                            ctx.stroke();
-                        }
-                    }
-                }
-            }
-
-            requestAnimationFrame(animate);
+      } else {
+        // 4A. Navegación aleatoria inicial
+        robot.wanderTimer -= dt;
+        if (robot.wanderTimer <= 0) {
+          robot.wanderTimer = 0.45 + Math.random() * 0.9;
+          robot.wanderAngle += (Math.random() - 0.5) * 1.65;
         }
 
-        init();
-        animate();
-    </script>
+        const centerAngle = Math.atan2(canvas.height / 2 - robot.y, canvas.width / 2 - robot.x);
+        if (muWall > 0.25) {
+          let diff = centerAngle - robot.wanderAngle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          robot.wanderAngle += diff * Math.min(1, dt * 3.5);
+        }
+
+        navForceX = Math.cos(robot.wanderAngle) * baseCruise * riskScale;
+        navForceY = Math.sin(robot.wanderAngle) * baseCruise * riskScale;
+      }
+
+      const wWall = muWall;
+      const wPeer = Math.min(1, muPeer * (1 - muWall * 0.3));
+      const wObs = Math.min(1, muObs * (1 - muWall * 0.3));
+      const wMode = Math.max(0.15, 1 - maxRisk * 0.6);
+
+      const totalVx = navForceX + wallForceX * 0.38 + peerForceX * 0.38 + obsForceX * 0.4;
+      const totalVy = navForceY + wallForceY * 0.38 + peerForceY * 0.38 + obsForceY * 0.4;
+
+      return {
+        vx: totalVx,
+        vy: totalVy,
+        fuzzy: {
+          wall: wWall,
+          peer: wPeer,
+          obs: wObs,
+          modeWeight: wMode,
+          evading: maxRisk > 0.2
+        }
+      };
+    }
+
+    function stepSimulation(dt) {
+      if (robots.length === 0) return;
+
+      const hasRoute = waypoints.length > 0;
+      if (hasRoute) {
+        const wpIdx = robots[0].wpIndex % waypoints.length;
+        const wpCurrent = waypoints[wpIdx];
+        const anyReached = robots.some(
+          (r) => Math.hypot(wpCurrent.x - r.x, wpCurrent.y - r.y) < 38
+        );
+
+        if (anyReached) {
+          const nextIdx = (wpIdx + 1) % waypoints.length;
+          robots.forEach((r) => {
+            r.wpIndex = nextIdx;
+          });
+        }
+      }
+
+      const nextSnapshots = robots.map((r) => {
+        const targetWp = hasRoute ? waypoints[r.wpIndex % waypoints.length] : null;
+        return evaluateFuzzyController(r, robots, targetWp, dt);
+      });
+
+      const maxSpeed = 160;
+      const smoothing = 1 - Math.exp(-5.4 * dt);
+
+      robots.forEach((r, idx) => {
+        const ctrl = nextSnapshots[idx];
+        r.fuzzy = ctrl.fuzzy;
+
+        r.vx += (ctrl.vx - r.vx) * smoothing;
+        r.vy += (ctrl.vy - r.vy) * smoothing;
+
+        const spd = Math.hypot(r.vx, r.vy);
+        if (spd > maxSpeed) {
+          r.vx = (r.vx / spd) * maxSpeed;
+          r.vy = (r.vy / spd) * maxSpeed;
+        }
+
+        r.x += r.vx * dt;
+        r.y += r.vy * dt;
+
+        const pad = 18;
+        if (r.x < pad) { r.x = pad; r.vx = Math.abs(r.vx) * 0.6; }
+        if (r.x > canvas.width - pad) { r.x = canvas.width - pad; r.vx = -Math.abs(r.vx) * 0.6; }
+        if (r.y < pad) { r.y = pad; r.vy = Math.abs(r.vy) * 0.6; }
+        if (r.y > canvas.height - pad) { r.y = canvas.height - pad; r.vy = -Math.abs(r.vy) * 0.6; }
+
+        if (spd > 3) {
+          r.angle = Math.atan2(r.vy, r.vx);
+        }
+
+        r.trail.push({ x: r.x, y: r.y });
+        if (r.trail.length > 65) r.trail.shift();
+      });
+    }
+
+    function drawArena() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const wallMargin = 78;
+      ctx.save();
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.14)";
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(
+        wallMargin,
+        wallMargin,
+        canvas.width - wallMargin * 2,
+        canvas.height - wallMargin * 2
+      );
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      if (waypoints.length > 1) {
+        ctx.save();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(waypoints[0].x, waypoints[0].y);
+        for (let i = 1; i < waypoints.length; i++) {
+          ctx.lineTo(waypoints[i].x, waypoints[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      waypoints.forEach((wp, i) => {
+        const isActiveWp = i === (robots[0]?.wpIndex % waypoints.length);
+        const isHoveredOrDragged =
+          (dragTarget?.type === "wp" && dragTarget.index === i) ||
+          (hoverTarget?.type === "wp" && hoverTarget.index === i);
+
+        const radius = isHoveredOrDragged ? 14 : (isActiveWp ? 12 : 9.5);
+
+        ctx.beginPath();
+        ctx.arc(wp.x, wp.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = isHoveredOrDragged
+          ? "rgba(52, 211, 153, 0.36)"
+          : (isActiveWp ? "rgba(52, 211, 153, 0.25)" : "rgba(52, 211, 153, 0.14)");
+        ctx.fill();
+        ctx.strokeStyle = isHoveredOrDragged ? "#6ee7b7" : "#34d399";
+        ctx.lineWidth = isHoveredOrDragged || isActiveWp ? 2.4 : 1.6;
+        ctx.stroke();
+
+        ctx.fillStyle = "#a7f3d0";
+        ctx.font = "600 11px sans-serif";
+        ctx.fillText(`WP ${i + 1}`, wp.x + 15, wp.y + 4);
+      });
+
+      if (robots.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.11)";
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < robots.length; i++) {
+          const curr = robots[i];
+          const next = robots[(i + 1) % robots.length];
+          ctx.moveTo(curr.x, curr.y);
+          ctx.lineTo(next.x, next.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (let i = 0; i < obstacles.length; i++) {
+        const obs = obstacles[i];
+        const isObsActive =
+          (dragTarget?.type === "obs" && dragTarget.index === i) ||
+          (hoverTarget?.type === "obs" && hoverTarget.index === i);
+
+        ctx.beginPath();
+        ctx.arc(obs.x, obs.y, obs.r + 52, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(248, 113, 113, 0.15)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI * 2);
+        ctx.fillStyle = isObsActive ? "rgba(248, 113, 113, 0.34)" : "rgba(248, 113, 113, 0.24)";
+        ctx.fill();
+        ctx.strokeStyle = isObsActive ? "#fca5a5" : "#f87171";
+        ctx.lineWidth = isObsActive ? 2.5 : 2;
+        ctx.stroke();
+      }
+
+      for (const r of robots) {
+        if (r.trail.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(r.trail[0].x, r.trail[0].y);
+          for (let i = 1; i < r.trail.length; i++) {
+            ctx.lineTo(r.trail[i].x, r.trail[i].y);
+          }
+          ctx.strokeStyle = r.color + "55";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        if (r.fuzzy.evading) {
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, 21, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(251, 191, 36, 0.72)";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.translate(r.x, r.y);
+        ctx.rotate(r.angle);
+
+        ctx.fillStyle = "#111318";
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(13, 0);
+        ctx.lineTo(-9, -9);
+        ctx.lineTo(-5, 0);
+        ctx.lineTo(-9, 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+
+        ctx.fillStyle = "#f3f4f6";
+        ctx.font = "600 11px sans-serif";
+        ctx.fillText(r.name, r.x - 16, r.y - 15);
+      }
+    }
+
+    function updatePanels() {
+      const hasRoute = waypoints.length > 0;
+      const totalWps = Math.max(1, waypoints.length);
+
+      robots.forEach((r) => {
+        const prefix = r.id;
+        const wpEl = document.getElementById(`wp-${prefix}`);
+        if (!wpEl) return;
+
+        wpEl.textContent = hasRoute ? `WP ${(r.wpIndex % totalWps) + 1}` : "Exploración";
+        document.getElementById(`wall-${prefix}`).textContent = r.fuzzy.wall.toFixed(2);
+        document.getElementById(`peer-${prefix}`).textContent = r.fuzzy.peer.toFixed(2);
+        document.getElementById(`obs-${prefix}`).textContent = r.fuzzy.obs.toFixed(2);
+
+        const badge = document.getElementById(`badge-${prefix}`);
+        if (r.fuzzy.evading) {
+          badge.textContent = "Esquivando";
+          badge.className = "pill evade";
+        } else if (hasRoute) {
+          badge.textContent = "Siguiendo Ruta";
+          badge.className = "pill sync";
+        } else {
+          badge.textContent = "Aleatorio";
+          badge.className = "pill random";
+        }
+
+        const weights = [r.fuzzy.wall, r.fuzzy.peer, r.fuzzy.obs, r.fuzzy.modeWeight];
+        weights.forEach((w, idx) => {
+          const el = document.getElementById(`${prefix}-f${idx + 1}`);
+          const wEl = document.getElementById(`${prefix}-w${idx + 1}`);
+          wEl.textContent = w.toFixed(2);
+          if (w > 0.08) {
+            el.classList.add("active");
+          } else {
+            el.classList.remove("active");
+          }
+        });
+      });
+    }
+
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+        y: ((e.clientY - rect.top) / rect.height) * canvas.height
+      };
+    }
+
+    function findHitTarget(x, y) {
+      for (let i = waypoints.length - 1; i >= 0; i--) {
+        if (Math.hypot(x - waypoints[i].x, y - waypoints[i].y) <= 18) {
+          return { type: "wp", index: i };
+        }
+      }
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (Math.hypot(x - obstacles[i].x, y - obstacles[i].y) <= obstacles[i].r + 10) {
+          return { type: "obs", index: i };
+        }
+      }
+      return null;
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      const { x, y } = getCanvasCoords(e);
+      const hit = findHitTarget(x, y);
+
+      if (hit) {
+        dragTarget = hit;
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+
+      if (addObstacleOnClick) {
+        obstacles.push({ x, y, r: 26 });
+      }
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      const { x, y } = getCanvasCoords(e);
+
+      if (dragTarget) {
+        const clampedX = Math.max(25, Math.min(canvas.width - 25, x));
+        const clampedY = Math.max(25, Math.min(canvas.height - 25, y));
+
+        if (dragTarget.type === "wp") {
+          waypoints[dragTarget.index].x = clampedX;
+          waypoints[dragTarget.index].y = clampedY;
+        } else if (dragTarget.type === "obs") {
+          obstacles[dragTarget.index].x = clampedX;
+          obstacles[dragTarget.index].y = clampedY;
+        }
+        return;
+      }
+
+      hoverTarget = findHitTarget(x, y);
+      if (hoverTarget) {
+        canvas.style.cursor = "grab";
+      } else {
+        canvas.style.cursor = addObstacleOnClick ? "crosshair" : "default";
+      }
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (dragTarget) {
+        dragTarget = null;
+        canvas.releasePointerCapture(e.pointerId);
+      }
+    });
+
+    const btnAddRobot = document.getElementById("btn-add-robot");
+    const btnAddRoute = document.getElementById("btn-add-route");
+    const btnModeObs = document.getElementById("btn-mode-obs");
+    const btnClearObs = document.getElementById("btn-clear-obs");
+    const btnReset = document.getElementById("btn-reset");
+
+    btnAddRobot.addEventListener("click", addRobotToSwarm);
+    btnAddRoute.addEventListener("click", addRouteToSwarm);
+
+    btnModeObs.addEventListener("click", () => {
+      addObstacleOnClick = !addObstacleOnClick;
+      btnModeObs.classList.toggle("active", addObstacleOnClick);
+      canvas.style.cursor = addObstacleOnClick ? "crosshair" : "default";
+    });
+
+    btnClearObs.addEventListener("click", () => {
+      obstacles = [];
+    });
+
+    btnReset.addEventListener("click", () => {
+      initSimulation();
+      addObstacleOnClick = true;
+      btnModeObs.classList.add("active");
+      canvas.style.cursor = "crosshair";
+    });
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      stepSimulation(dt);
+      drawArena();
+      updatePanels();
+
+      requestAnimationFrame(loop);
+    }
+
+    initSimulation();
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
