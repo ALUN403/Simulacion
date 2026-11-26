@@ -4,63 +4,204 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Actividad STEM EV3: Lógica Reactiva</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Estilos base y configuración de pantalla completa sin scroll */
         body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; background-color: #1a1a1d;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1d;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ffffff;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        canvas { display: block; }
+
+        /* Contenedor de la arena delimitada */
+        #arena-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            display: block;
+            background-color: #141417;
+            border: 2px solid rgba(243, 156, 18, 0.55);
+            border-radius: 12px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.75), inset 0 0 24px rgba(0, 0, 0, 0.45);
+            touch-action: none; /* Evita scroll o zoom al arrastrar en pantallas táctiles */
+        }
+
+        /* Panel lateral con efecto glassmorphism (#2e2e38 y acentos #f39c12) */
         #ui-panel {
-            position: absolute; top: 20px; left: 20px; width: 340px;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 340px;
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
             background: rgba(46, 46, 56, 0.85);
-            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(243, 156, 18, 0.3);
-            border-radius: 12px; padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 10;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            z-index: 10;
         }
-        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid rgba(243, 156, 18, 0.4); padding-bottom: 10px; color: #f39c12; }
-        .control-group { margin-bottom: 15px; }
-        .control-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: #ecf0f1; }
-        input[type="range"] { width: 100%; cursor: pointer; accent-color: #f39c12; }
-        .desc { font-size: 0.7rem; color: #95a5a6; display: block; margin-top: -3px; margin-bottom: 6px; }
-        
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(243, 156, 18, 0.4);
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+            color: #f39c12;
+            cursor: grab;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        h2:active {
+            cursor: grabbing;
+        }
+
+        .drag-grip {
+            display: inline-flex;
+            align-items: center;
+            color: rgba(243, 156, 18, 0.65);
+            flex-shrink: 0;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #ecf0f1;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #f39c12;
+            height: 6px;
+            border-radius: 4px;
+        }
+
+        .desc {
+            font-size: 0.7rem;
+            color: #95a5a6;
+            display: block;
+            margin-top: -2px;
+            margin-bottom: 6px;
+        }
+
         #stats-board {
-            margin-top: 20px; padding: 15px;
-            background: rgba(0,0,0,0.4); border-radius: 8px;
-            text-align: center; border: 1px solid rgba(231, 76, 60, 0.3);
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(231, 76, 60, 0.3);
         }
-        .stat-value { font-size: 2rem; color: #e74c3c; font-weight: bold; }
-        .stat-label { font-size: 0.8rem; color: #bdc3c7; text-transform: uppercase; letter-spacing: 1px;}
-        
-        button {
-            width: 100%; padding: 10px; margin-top: 15px;
-            background: #f39c12; color: #1a1a1d; border: none;
-            border-radius: 6px; font-weight: bold; cursor: pointer;
-            transition: background 0.2s;
+
+        .stat-value {
+            font-size: 2rem;
+            color: #e74c3c;
+            font-weight: bold;
+            line-height: 1.1;
         }
-        button:hover { background: #e67e22; }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #bdc3c7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        button.btn-reset {
+            width: 100%;
+            padding: 10px;
+            margin-top: 15px;
+            background: #f39c12;
+            color: #1a1a1d;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button.btn-reset:hover {
+            background: #e67e22;
+        }
+
+        button.btn-reset:active {
+            transform: scale(0.99);
+        }
     </style>
 </head>
 <body>
+    <!-- Panel de control y telemetría STEM -->
+    <aside id="ui-panel" aria-label="Controles de simulación EV3">
+        <h2 id="ui-panel-header" title="Arrastra para mover este panel">
+            <span>Arquitectura Reactiva EV3</span>
+            <span class="drag-grip" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="5" cy="3.5" r="1.2"/>
+                    <circle cx="11" cy="3.5" r="1.2"/>
+                    <circle cx="5" cy="8" r="1.2"/>
+                    <circle cx="11" cy="8" r="1.2"/>
+                    <circle cx="5" cy="12.5" r="1.2"/>
+                    <circle cx="11" cy="12.5" r="1.2"/>
+                </svg>
+            </span>
+        </h2>
 
-    <div id="ui-panel">
-        <h2>Arquitectura Reactiva EV3</h2>
-        
         <div class="control-group">
-            <label><span>Robots en Prueba</span> <span id="val-robots">15</span></label>
-            <input type="range" id="slider-robots" min="1" max="30" value="15">
+            <label for="slider-robots">
+                <span>Robots en Prueba</span>
+                <span id="val-robots">2</span>
+            </label>
+            <input type="range" id="slider-robots" min="1" max="5" step="1" value="2">
         </div>
 
         <div class="control-group">
-            <label><span>Rango del Ultrasónico</span> <span id="val-sensor">70px</span></label>
+            <label for="slider-sensor">
+                <span>Rango del Ultrasónico</span>
+                <span id="val-sensor">70px</span>
+            </label>
             <span class="desc">Distancia umbral para activar el desvío.</span>
-            <input type="range" id="slider-sensor" min="30" max="150" value="70">
+            <input type="range" id="slider-sensor" min="30" max="70" step="1" value="70">
         </div>
 
         <div class="control-group">
-            <label><span>Velocidad de Motores</span> <span id="val-vel">2.5</span></label>
-            <input type="range" id="slider-vel" min="1" max="5" step="0.1" value="2.5">
+            <label for="slider-vel">
+                <span>Velocidad de Motores</span>
+                <span id="val-vel">3.0</span>
+            </label>
+            <input type="range" id="slider-vel" min="1" max="3" step="0.1" value="3">
         </div>
 
         <div id="stats-board">
@@ -68,278 +209,563 @@
             <div class="stat-label">Colisiones Registradas</div>
         </div>
 
-        <button onclick="reiniciarPrueba()">Reiniciar Experimento</button>
-        <p style="font-size: 0.7rem; color: #95a5a6; text-align: center; margin-top: 15px;">Arrastra los círculos (obstáculos) o la zona meta (naranja).</p>
-    </div>
+        <button type="button" class="btn-reset" id="btn-reiniciar" onclick="reiniciarPrueba()">
+            Reiniciar Experimento
+        </button>
 
-    <canvas id="simCanvas"></canvas>
+        <p class="text-[0.7rem] text-[#95a5a6] text-center mt-4 mb-0 leading-relaxed">
+            Arrastra los círculos (obstáculos) dentro de la pista para reorganizar la arena.
+        </p>
+    </aside>
+
+    <!-- Arena delimitada y compacta -->
+    <main id="arena-wrapper" aria-label="Pista de simulación">
+        <canvas id="simCanvas"></canvas>
+    </main>
 
     <script>
+        // Referencias al canvas y contexto 2D
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.addEventListener('resize', resize);
-        resize();
 
-        let numRobots = 15;
+        // Referencias a elementos de interfaz
+        const uiPanel = document.getElementById('ui-panel');
+        const uiPanelHeader = document.getElementById('ui-panel-header');
+        const sliderRobots = document.getElementById('slider-robots');
+        const sliderSensor = document.getElementById('slider-sensor');
+        const sliderVel = document.getElementById('slider-vel');
+        const valRobots = document.getElementById('val-robots');
+        const valSensor = document.getElementById('val-sensor');
+        const valVel = document.getElementById('val-vel');
+        const valColisiones = document.getElementById('val-colisiones');
+
+        // Parámetros configurables de la simulación
+        let numRobots = 2;
         let sensorRange = 70;
-        let baseSpeed = 2.5;
+        let baseSpeed = 3.0;
         let totalColisiones = 0;
 
-        document.getElementById('slider-robots').oninput = e => { numRobots = parseInt(e.target.value); document.getElementById('val-robots').innerText = numRobots; reiniciarPrueba(); };
-        document.getElementById('slider-sensor').oninput = e => { sensorRange = parseInt(e.target.value); document.getElementById('val-sensor').innerText = sensorRange + 'px'; };
-        document.getElementById('slider-vel').oninput = e => { baseSpeed = parseFloat(e.target.value); document.getElementById('val-vel').innerText = baseSpeed.toFixed(1); };
-
-        let meta = { x: canvas.width - 100, y: canvas.height / 2, radius: 40, isDragging: false };
+        // Estado de entidades en la arena
         let obstaculos = [];
         let robots = [];
         let efectosColision = [];
+        let objetoArrastrado = null;
 
-        function generarObstaculos() {
-            obstaculos = [];
-            for(let i=0; i<6; i++) {
-                obstaculos.push({
-                    x: canvas.width * 0.3 + Math.random() * (canvas.width * 0.4),
-                    y: canvas.height * 0.2 + Math.random() * (canvas.height * 0.6),
-                    radius: 30 + Math.random() * 20,
-                    isDragging: false
-                });
+        // Estado para el arrastre de la ventana de parámetros (#ui-panel)
+        let arrastrandoPanel = false;
+        let offsetPanelX = 0;
+        let offsetPanelY = 0;
+
+        /**
+         * Mantiene el panel flotante de parámetros dentro de los límites visibles de la ventana.
+         */
+        function limitarPosicionPanel(left, top) {
+            const margin = 10;
+            const maxLeft = Math.max(margin, window.innerWidth - uiPanel.offsetWidth - margin);
+            const maxTop = Math.max(margin, window.innerHeight - uiPanel.offsetHeight - margin);
+            uiPanel.style.left = Math.min(Math.max(margin, left), maxLeft) + 'px';
+            uiPanel.style.top = Math.min(Math.max(margin, top), maxTop) + 'px';
+        }
+
+        function iniciarArrastrePanel(clientX, clientY) {
+            arrastrandoPanel = true;
+            const rect = uiPanel.getBoundingClientRect();
+            offsetPanelX = clientX - rect.left;
+            offsetPanelY = clientY - rect.top;
+            uiPanelHeader.style.cursor = 'grabbing';
+        }
+
+        function moverArrastrePanel(clientX, clientY) {
+            if (!arrastrandoPanel) return;
+            limitarPosicionPanel(clientX - offsetPanelX, clientY - offsetPanelY);
+        }
+
+        function finalizarArrastrePanel() {
+            if (!arrastrandoPanel) return;
+            arrastrandoPanel = false;
+            uiPanelHeader.style.cursor = 'grab';
+        }
+
+        uiPanelHeader.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            iniciarArrastrePanel(e.clientX, e.clientY);
+        });
+        window.addEventListener('mousemove', (e) => moverArrastrePanel(e.clientX, e.clientY));
+        window.addEventListener('mouseup', finalizarArrastrePanel);
+
+        uiPanelHeader.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                iniciarArrastrePanel(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+        window.addEventListener('touchmove', (e) => {
+            if (arrastrandoPanel && e.touches.length > 0) {
+                e.preventDefault();
+                moverArrastrePanel(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        window.addEventListener('touchend', finalizarArrastrePanel);
+        window.addEventListener('touchcancel', finalizarArrastrePanel);
+
+        /**
+         * Calcula un tamaño cómodo y delimitado para la pista aprovechando el espacio disponible.
+         */
+        function calcularDimensionesPista() {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const availableW = Math.max(280, vw - 48);
+            const availableH = Math.max(260, vh - 48);
+            return {
+                width: Math.round(Math.min(840, availableW)),
+                height: Math.round(Math.min(580, availableH))
+            };
+        }
+
+        /**
+         * Ajusta el tamaño del lienzo delimitado y reposiciona obstáculos y robots si es necesario.
+         */
+        function resize() {
+            try {
+                const prevWidth = canvas.width || 840;
+                const prevHeight = canvas.height || 580;
+                const { width, height } = calcularDimensionesPista();
+                canvas.width = width;
+                canvas.height = height;
+
+                if (prevWidth > 0 && prevHeight > 0) {
+                    for (let i = 0; i < obstaculos.length; i++) {
+                        const obs = obstaculos[i];
+                        obs.x = Math.min(Math.max(obs.radius + 12, (obs.x / prevWidth) * canvas.width), canvas.width - obs.radius - 12);
+                        obs.y = Math.min(Math.max(obs.radius + 12, (obs.y / prevHeight) * canvas.height), canvas.height - obs.radius - 12);
+                    }
+                    for (let i = 0; i < robots.length; i++) {
+                        const rob = robots[i];
+                        rob.x = Math.min(Math.max(rob.radius + 10, rob.x), canvas.width - rob.radius - 10);
+                        rob.y = Math.min(Math.max(rob.radius + 10, rob.y), canvas.height - rob.radius - 10);
+                    }
+                }
+
+                const rectPanel = uiPanel.getBoundingClientRect();
+                limitarPosicionPanel(rectPanel.left, rectPanel.top);
+            } catch (err) {
+                console.error('Error al redimensionar la pista:', err);
             }
         }
 
+        /**
+         * Ajusta el número de robots activos en la pista sin reiniciar obstáculos ni colisiones.
+         */
+        function ajustarCantidadRobots(nuevaCantidad) {
+            numRobots = nuevaCantidad;
+            valRobots.innerText = numRobots;
+            if (robots.length < numRobots) {
+                for (let i = robots.length; i < numRobots; i++) {
+                    robots.push(new RobotReactivo(i));
+                }
+            } else if (robots.length > numRobots) {
+                robots.length = numRobots;
+            }
+        }
+
+        // Listeners de controles deslizantes
+        sliderRobots.addEventListener('input', (e) => ajustarCantidadRobots(parseInt(e.target.value, 10)));
+        sliderSensor.addEventListener('input', (e) => {
+            sensorRange = parseInt(e.target.value, 10);
+            valSensor.innerText = sensorRange + 'px';
+        });
+        sliderVel.addEventListener('input', (e) => {
+            baseSpeed = parseFloat(e.target.value);
+            valVel.innerText = baseSpeed.toFixed(1);
+        });
+
+        /**
+         * Genera los 6 obstáculos circulares en las posiciones y tamaños relativos exactos de referencia.
+         */
+        function generarObstaculos() {
+            const configuracionObstaculos = [
+                { x: 0.335 * canvas.width, y: 0.20 * canvas.height,  radius: (28 / 760) * canvas.width }, // 1. Superior izquierda
+                { x: 0.51 * canvas.width,  y: 0.37 * canvas.height,  radius: (28 / 760) * canvas.width }, // 2. Central superior
+                { x: 0.685 * canvas.width, y: 0.29 * canvas.height,  radius: (24 / 760) * canvas.width }, // 3. Superior derecha
+                { x: 0.333 * canvas.width, y: 0.59 * canvas.height,  radius: (28 / 760) * canvas.width }, // 4. Inferior izquierda
+                { x: 0.495 * canvas.width, y: 0.725 * canvas.height, radius: (34 / 760) * canvas.width }, // 5. Inferior central (más grande)
+                { x: 0.635 * canvas.width, y: 0.74 * canvas.height,  radius: (24 / 760) * canvas.width }  // 6. Inferior derecha
+            ];
+
+            obstaculos = configuracionObstaculos.map((obs) => ({
+                x: Math.min(Math.max(obs.radius + 12, obs.x), canvas.width - obs.radius - 12),
+                y: Math.min(Math.max(obs.radius + 12, obs.y), canvas.height - obs.radius - 12),
+                radius: obs.radius,
+                isDragging: false
+            }));
+        }
+
+        /**
+         * Clase que modela un robot EV3 con arquitectura de control reactivo basada en sensor ultrasónico.
+         */
         class RobotReactivo {
             constructor(id) {
                 this.id = id;
                 this.radius = 12;
-                this.x = 50 + Math.random() * 100;
-                this.y = 50 + Math.random() * (canvas.height - 100);
-                this.angle = 0; 
-                
-                this.estado = 0;
-                this.direccionEsquive = 1; 
+                this.x = 30 + Math.random() * Math.max(40, canvas.width - 60);
+                this.y = 30 + Math.random() * Math.max(40, canvas.height - 60);
+                this.angle = Math.random() * Math.PI * 2;
+                this.tasaGiroAleatorio = (Math.random() - 0.5) * 0.04;
+                this.pasosRestantesRumbo = 20 + Math.floor(Math.random() * 50);
+                this.estado = 0; // 0 = explorar aleatoriamente, 1 = esquivar
+                this.direccionEsquive = 1; // 1 = horario, -1 = antihorario
                 this.tiempoEsquive = 0;
-                
-                this.cooldownColision = 0; 
-                
-                // Color azul vibrante
-                this.color = '#00a8ff'; 
+                this.cooldownColision = 0;
+                this.color = '#00a8ff';
             }
 
+            /**
+             * Normaliza un ángulo en radianes al rango [-PI, PI].
+             */
+            normalizarAngulo(rad) {
+                return Math.atan2(Math.sin(rad), Math.cos(rad));
+            }
+
+            /**
+             * Actualiza percepción sensorial, toma de decisión reactiva, cinemática y colisiones.
+             */
             update(todosRobots) {
                 let obstaculoEnFrente = false;
                 let distMinima = sensorRange;
-                
+                const medioCono = 0.45; // ~25.8 grados a cada lado del eje frontal
+
+                // Evalúa si un objeto circular entra en el cono frontal del sensor ultrasónico
                 const checarRayo = (objX, objY, objRadio) => {
-                    let dx = objX - this.x;
-                    let dy = objY - this.y;
-                    let dist = Math.hypot(dx, dy) - this.radius - objRadio;
-                    
-                    if(dist < sensorRange) {
-                        let anguloHaciaObj = Math.atan2(dy, dx);
-                        let diffAngulo = this.angle - anguloHaciaObj;
-                        diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
-                        
-                        if(Math.abs(diffAngulo) < 0.45) {
+                    const dx = objX - this.x;
+                    const dy = objY - this.y;
+                    const distSuperficie = Math.hypot(dx, dy) - this.radius - objRadio;
+
+                    if (distSuperficie < sensorRange) {
+                        const anguloHaciaObj = Math.atan2(dy, dx);
+                        const diffAngulo = this.normalizarAngulo(this.angle - anguloHaciaObj);
+
+                        if (Math.abs(diffAngulo) < medioCono) {
                             obstaculoEnFrente = true;
-                            if(dist < distMinima) distMinima = dist;
+                            if (distSuperficie < distMinima) {
+                                distMinima = distSuperficie;
+                            }
                             if (this.estado === 0) {
+                                // Gira en sentido opuesto al lado en que percibe el obstáculo
                                 this.direccionEsquive = diffAngulo > 0 ? 1 : -1;
                             }
                         }
                     }
                 };
 
-                obstaculos.forEach(obs => checarRayo(obs.x, obs.y, obs.radius));
-                todosRobots.forEach(rob => {
-                    if (rob.id !== this.id) checarRayo(rob.x, rob.y, rob.radius);
-                });
+                // Sensado de obstáculos arrastrables
+                for (let i = 0; i < obstaculos.length; i++) {
+                    checarRayo(obstaculos[i].x, obstaculos[i].y, obstaculos[i].radius);
+                }
 
+                // Sensado de otros robots en la arena
+                for (let i = 0; i < todosRobots.length; i++) {
+                    const rob = todosRobots[i];
+                    if (rob.id !== this.id) {
+                        checarRayo(rob.x, rob.y, rob.radius);
+                    }
+                }
+
+                // Transición de estados reactivos
                 if (obstaculoEnFrente) {
-                    this.estado = 1; 
-                    this.tiempoEsquive = 20; 
+                    this.estado = 1;
+                    this.tiempoEsquive = 20;
                 } else if (this.tiempoEsquive > 0) {
                     this.tiempoEsquive--;
                 } else {
-                    this.estado = 0; 
+                    this.estado = 0;
                 }
 
+                // Ejecución de comportamiento según estado activo
                 if (this.estado === 1) {
-                    this.angle += 0.08 * this.direccionEsquive;
+                    this.angle = this.normalizarAngulo(this.angle + 0.08 * this.direccionEsquive);
                     this.x += Math.cos(this.angle) * (baseSpeed * 0.3);
                     this.y += Math.sin(this.angle) * (baseSpeed * 0.3);
                 } else {
-                    let anguloMeta = Math.atan2(meta.y - this.y, meta.x - this.x);
-                    let diffAngulo = this.angle - anguloMeta;
-                    diffAngulo = Math.atan2(Math.sin(diffAngulo), Math.cos(diffAngulo));
-                    this.angle -= diffAngulo * 0.05; 
-                    
+                    if (this.pasosRestantesRumbo <= 0) {
+                        this.pasosRestantesRumbo = 20 + Math.floor(Math.random() * 60);
+                        this.tasaGiroAleatorio = (Math.random() - 0.5) * 0.05;
+                    } else {
+                        this.tasaGiroAleatorio += (Math.random() - 0.5) * 0.008;
+                        this.tasaGiroAleatorio = Math.max(-0.05, Math.min(0.05, this.tasaGiroAleatorio));
+                        this.pasosRestantesRumbo--;
+                    }
+
+                    this.angle = this.normalizarAngulo(this.angle + this.tasaGiroAleatorio);
                     this.x += Math.cos(this.angle) * baseSpeed;
                     this.y += Math.sin(this.angle) * baseSpeed;
                 }
 
-                if (this.cooldownColision > 0) this.cooldownColision--;
-                
+                // Reducción de cooldown de colisiones
+                if (this.cooldownColision > 0) {
+                    this.cooldownColision--;
+                }
+
+                // Detección física de colisión, aplicación de repulsión y registro de impacto
                 const checarColision = (objX, objY, objRadio) => {
-                    let dist = Math.hypot(objX - this.x, objY - this.y);
-                    if (dist < this.radius + objRadio - 2) { 
-                        if(this.cooldownColision === 0) {
+                    const dx = this.x - objX;
+                    const dy = this.y - objY;
+                    const dist = Math.hypot(dx, dy);
+                    const umbralColision = this.radius + objRadio - 2;
+
+                    if (dist < umbralColision) {
+                        if (this.cooldownColision === 0) {
                             totalColisiones++;
-                            document.getElementById('val-colisiones').innerText = totalColisiones;
-                            this.cooldownColision = 30; 
-                            efectosColision.push({x: this.x + (objX-this.x)/2, y: this.y + (objY-this.y)/2, life: 1.0});
+                            valColisiones.innerText = totalColisiones;
+                            this.cooldownColision = 30;
+                            efectosColision.push({
+                                x: this.x + (objX - this.x) / 2,
+                                y: this.y + (objY - this.y) / 2,
+                                life: 1.0
+                            });
                         }
-                        let repX = this.x - objX; let repY = this.y - objY;
-                        this.x += (repX/dist) * 2; this.y += (repY/dist) * 2;
+
+                        if (dist > 0.0001) {
+                            this.x += (dx / dist) * 2;
+                            this.y += (dy / dist) * 2;
+                        } else {
+                            this.x += 2;
+                        }
                     }
                 };
 
-                obstaculos.forEach(obs => checarColision(obs.x, obs.y, obs.radius));
-                todosRobots.forEach(rob => {
-                    if (rob.id !== this.id && rob.id > this.id) checarColision(rob.x, rob.y, rob.radius); 
-                });
-                
-                if(this.x < 10) this.x = 10;
-                if(this.x > canvas.width - 10) this.x = canvas.width - 10;
-                if(this.y < 10) this.y = 10;
-                if(this.y > canvas.height - 10) this.y = canvas.height - 10;
+                // Colisiones con obstáculos
+                for (let i = 0; i < obstaculos.length; i++) {
+                    checarColision(obstaculos[i].x, obstaculos[i].y, obstaculos[i].radius);
+                }
+
+                // Colisiones entre pares de robots (evita duplicar por par usando rob.id > this.id)
+                for (let i = 0; i < todosRobots.length; i++) {
+                    const rob = todosRobots[i];
+                    if (rob.id !== this.id && rob.id > this.id) {
+                        checarColision(rob.x, rob.y, rob.radius);
+                    }
+                }
+
+                // Contención y rebote suave en los bordes de la pista
+                let rebotoEnBorde = false;
+                if (this.x < this.radius + 6) {
+                    this.x = this.radius + 6;
+                    rebotoEnBorde = true;
+                } else if (this.x > canvas.width - this.radius - 6) {
+                    this.x = canvas.width - this.radius - 6;
+                    rebotoEnBorde = true;
+                }
+
+                if (this.y < this.radius + 6) {
+                    this.y = this.radius + 6;
+                    rebotoEnBorde = true;
+                } else if (this.y > canvas.height - this.radius - 6) {
+                    this.y = canvas.height - this.radius - 6;
+                    rebotoEnBorde = true;
+                }
+
+                if (rebotoEnBorde) {
+                    const anguloCentro = Math.atan2(canvas.height / 2 - this.y, canvas.width / 2 - this.x);
+                    this.angle = this.normalizarAngulo(anguloCentro + (Math.random() - 0.5) * 0.8);
+                    this.pasosRestantesRumbo = 25 + Math.floor(Math.random() * 40);
+                }
             }
 
+            /**
+             * Dibuja el cono ultrasónico (verde en exploración, rojo en evasión) y el cuerpo del robot.
+             */
             draw() {
-                // Visualizar cono del sensor ultrasónico
+                // Cono del sensor ultrasónico
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.arc(this.x, this.y, sensorRange, this.angle - 0.45, this.angle + 0.45);
                 ctx.lineTo(this.x, this.y);
-                ctx.fillStyle = this.estado === 1 ? "rgba(231, 76, 60, 0.15)" : "rgba(46, 204, 113, 0.05)";
+                ctx.fillStyle = this.estado === 1
+                    ? 'rgba(231, 76, 60, 0.15)'
+                    : 'rgba(46, 204, 113, 0.05)';
                 ctx.fill();
 
+                ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
-                
-                // Configurar sombra suave
-                ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+
+                // Sombra suave del chasis
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
                 ctx.shadowBlur = 8;
                 ctx.shadowOffsetX = -2;
                 ctx.shadowOffsetY = 3;
-                
-                // Cuerpo circular
+
+                // Cuerpo circular azul vibrante
                 ctx.beginPath();
                 ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
-                
+
                 // Borde blanco grueso
-                ctx.strokeStyle = "#ffffff";
+                ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2.5;
                 ctx.stroke();
 
-                // Quitar la sombra para los detalles internos
-                ctx.shadowColor = "transparent";
+                // Desactivar sombra para detalles internos
+                ctx.shadowColor = 'transparent';
 
                 // Línea direccional interna
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(this.radius, 0);
-                ctx.strokeStyle = "#ffffff";
+                ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2.5;
                 ctx.stroke();
-                
-                // Esfera indicadora (antena) en la punta del vector
+
+                // Antena / indicador frontal
                 ctx.beginPath();
                 ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
+                ctx.fillStyle = '#ffffff';
                 ctx.fill();
 
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.restore();
             }
         }
 
+        /**
+         * Reinicia el experimento completo: obstáculos, robots y contador de colisiones.
+         */
         function reiniciarPrueba() {
-            robots = [];
-            totalColisiones = 0;
-            document.getElementById('val-colisiones').innerText = 0;
-            efectosColision = [];
-            generarObstaculos();
-            meta.x = canvas.width - 100;
-            meta.y = canvas.height / 2;
-            for(let i=0; i<numRobots; i++) {
-                robots.push(new RobotReactivo(i));
+            try {
+                robots = [];
+                totalColisiones = 0;
+                valColisiones.innerText = 0;
+                efectosColision = [];
+                objetoArrastrado = null;
+
+                resize();
+                generarObstaculos();
+
+                for (let i = 0; i < numRobots; i++) {
+                    robots.push(new RobotReactivo(i));
+                }
+            } catch (err) {
+                console.error('Error al reiniciar la prueba:', err);
             }
         }
 
-        let objetoArrastrado = null;
-        canvas.addEventListener('mousedown', e => {
-            let mX = e.clientX; let mY = e.clientY;
-            if(Math.hypot(mX - meta.x, mY - meta.y) <= meta.radius) {
-                objetoArrastrado = meta; return;
-            }
-            for(let obs of obstaculos) {
-                if(Math.hypot(mX - obs.x, mY - obs.y) <= obs.radius) {
-                    objetoArrastrado = obs; return;
+        // Soporte para arrastrar obstáculos con mouse y táctil
+        function iniciarArrastre(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const mX = clientX - rect.left;
+            const mY = clientY - rect.top;
+
+            for (let i = 0; i < obstaculos.length; i++) {
+                const obs = obstaculos[i];
+                if (Math.hypot(mX - obs.x, mY - obs.y) <= obs.radius) {
+                    objetoArrastrado = obs;
+                    return;
                 }
             }
-        });
-        canvas.addEventListener('mousemove', e => {
-            if(objetoArrastrado) {
-                objetoArrastrado.x = e.clientX;
-                objetoArrastrado.y = e.clientY;
+        }
+
+        function moverArrastre(clientX, clientY) {
+            if (!objetoArrastrado) return;
+            const rect = canvas.getBoundingClientRect();
+            const mX = clientX - rect.left;
+            const mY = clientY - rect.top;
+
+            objetoArrastrado.x = Math.min(Math.max(objetoArrastrado.radius, mX), canvas.width - objetoArrastrado.radius);
+            objetoArrastrado.y = Math.min(Math.max(objetoArrastrado.radius, mY), canvas.height - objetoArrastrado.radius);
+        }
+
+        function finalizarArrastre() {
+            objetoArrastrado = null;
+        }
+
+        canvas.addEventListener('mousedown', (e) => iniciarArrastre(e.clientX, e.clientY));
+        canvas.addEventListener('mousemove', (e) => moverArrastre(e.clientX, e.clientY));
+        window.addEventListener('mouseup', finalizarArrastre);
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                iniciarArrastre(e.touches[0].clientX, e.touches[0].clientY);
             }
-        });
-        window.addEventListener('mouseup', () => { objetoArrastrado = null; });
+        }, { passive: true });
 
+        canvas.addEventListener('touchmove', (e) => {
+            if (objetoArrastrado && e.touches.length > 0) {
+                e.preventDefault();
+                moverArrastre(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', finalizarArrastre);
+        window.addEventListener('touchcancel', finalizarArrastre);
+
+        /**
+         * Bucle principal de renderizado y actualización de la simulación.
+         */
         function animate() {
-            ctx.fillStyle = "#1a1a1d";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            try {
+                // Fondo delimitado de la pista
+                ctx.fillStyle = '#141417';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Dibujar Meta
-            ctx.beginPath();
-            ctx.arc(meta.x, meta.y, meta.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(243, 156, 18, 0.2)";
-            ctx.fill();
-            ctx.strokeStyle = "#f39c12";
-            ctx.setLineDash([5, 5]);
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.setLineDash([]);
-            
-            ctx.fillStyle = "#f39c12";
-            ctx.font = "14px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText("PUNTO B", meta.x, meta.y + 4);
+                // Dibujar cuadrícula sutil de referencia dentro de la pista
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+                ctx.lineWidth = 1;
+                const pasoCuadricula = 40;
+                for (let x = pasoCuadricula; x < canvas.width; x += pasoCuadricula) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = pasoCuadricula; y < canvas.height; y += pasoCuadricula) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
 
-            // Dibujar Obstáculos
-            obstaculos.forEach(obs => {
-                ctx.beginPath();
-                ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
-                ctx.fillStyle = "#2c3e50";
-                ctx.fill();
-                ctx.strokeStyle = "#95a5a6";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            });
+                // Dibujar obstáculos circulares
+                for (let i = 0; i < obstaculos.length; i++) {
+                    const obs = obstaculos[i];
+                    ctx.beginPath();
+                    ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fill();
+                    ctx.strokeStyle = '#95a5a6';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
 
-            // Actualizar Robots
-            robots.forEach(r => {
-                r.update(robots);
-                r.draw();
-            });
+                // Actualizar y dibujar robots reactivos
+                for (let i = 0; i < robots.length; i++) {
+                    robots[i].update(robots);
+                    robots[i].draw();
+                }
 
-            // Dibujar destellos de colisión
-            for (let i = efectosColision.length - 1; i >= 0; i--) {
-                let ef = efectosColision[i];
-                ctx.beginPath();
-                ctx.arc(ef.x, ef.y, 10 + (1 - ef.life)*20, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(231, 76, 60, ${ef.life})`;
-                ctx.fill();
-                ef.life -= 0.05;
-                if(ef.life <= 0) efectosColision.splice(i, 1);
+                // Dibujar y desvanecer destellos rojos de colisión
+                for (let i = efectosColision.length - 1; i >= 0; i--) {
+                    const ef = efectosColision[i];
+                    ctx.beginPath();
+                    ctx.arc(ef.x, ef.y, 10 + (1 - ef.life) * 20, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(231, 76, 60, ${ef.life})`;
+                    ctx.fill();
+                    ef.life -= 0.05;
+                    if (ef.life <= 0) {
+                        efectosColision.splice(i, 1);
+                    }
+                }
+            } catch (err) {
+                console.error('Error en el ciclo de animación:', err);
             }
 
             requestAnimationFrame(animate);
         }
 
-        reiniciarPrueba();
-        animate();
+        // Inicialización de la simulación
+        window.addEventListener('resize', resize);
+        window.onload = function () {
+            reiniciarPrueba();
+            animate();
+        };
     </script>
 </body>
 </html>
