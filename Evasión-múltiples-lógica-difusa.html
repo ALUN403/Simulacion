@@ -55,37 +55,6 @@
     font-size: 1.25rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    margin-bottom: 14px;
-  }
-
-  .divider {
-    height: 1px;
-    background-color: var(--border-subtle);
-    margin-bottom: 14px;
-  }
-
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .metric-label {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-  }
-
-  .metric-value {
-    font-size: 1.35rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 3px;
-  }
-
-  .metric-sub {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
   }
 
   /* Canvas Card */
@@ -220,36 +189,16 @@
   }
 
   @media (max-width: 600px) {
-    .metrics-grid, .sliders-grid { grid-template-columns: 1fr; }
+    .sliders-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
 <div class="app-shell">
-  <!-- Panel Superior: Título y Telemetría -->
+  <!-- Panel Superior: Título -->
   <div class="card">
     <div class="header-title">Enjambres con Inferencia Difusa Híbrida</div>
-
-    <div class="divider"></div>
-
-    <div class="metrics-grid">
-      <div>
-        <div class="metric-label">Distancia mínima d<sub>min</sub></div>
-        <div class="metric-value" id="dMinVal">-- m</div>
-        <div class="metric-sub">Umbral colisión 2R = 0.50 m</div>
-      </div>
-      <div>
-        <div class="metric-label">Tiempo de misión</div>
-        <div class="metric-value" id="timeVal">0.0 s</div>
-        <div class="metric-sub" id="robotsCountSub">6 robots activos (3 grupos)</div>
-      </div>
-      <div>
-        <div class="metric-label">Activación Mamdani</div>
-        <div class="metric-value" id="mamdaniVal">0 %</div>
-        <div class="metric-sub" id="invasionsSub">0 invasiones de umbral</div>
-      </div>
-    </div>
   </div>
 
   <!-- Panel Central: Lienzo de Simulación -->
@@ -332,8 +281,6 @@ function fisMamdaniEvasion(d, theta, rSens) {
   const w5 = Math.min(muDCerca, Math.max(muThIzq, muThDer));
   const w6 = muDLejos;
 
-  const activation = Math.max(w1, w2, w3, w4, w5);
-
   // Defuzzificación por centroide (Magnitud)
   let numMag = 0, denMag = 0;
   const steps = 36;
@@ -365,7 +312,7 @@ function fisMamdaniEvasion(d, theta, rSens) {
   }
   const angSalida = denAng === 0 ? 0 : numAng / denAng;
 
-  return { mag: magSalida, ang: angSalida, activation };
+  return { mag: magSalida, ang: angSalida };
 }
 
 // ============================================================================
@@ -417,8 +364,6 @@ function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
 
   // C. Evasión inter-enjambre (Mamdani)
   let fColX = 0, fColY = 0;
-  let dMinLocal = Infinity;
-  let maxActLocal = 0;
 
   for (const otherSwarm of allSwarms) {
     if (otherSwarm.id === ownSwarm.id) continue;
@@ -426,7 +371,6 @@ function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
       const dx = intruder.x - agent.x;
       const dy = intruder.y - agent.y;
       const d = Math.hypot(dx, dy);
-      if (d < dMinLocal) dMinLocal = d;
 
       if (d < rSensor) {
         const vNorm = Math.hypot(agent.vx, agent.vy);
@@ -434,8 +378,7 @@ function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
         const angK = Math.atan2(dy, dx);
         const thetaRel = wrapToPi(angK - angV);
 
-        const { mag, ang, activation } = fisMamdaniEvasion(d, thetaRel, rSensor);
-        if (activation > maxActLocal) maxActLocal = activation;
+        const { mag, ang } = fisMamdaniEvasion(d, thetaRel, rSensor);
 
         const repX = -dx / (d + 1e-6);
         const repY = -dy / (d + 1e-6);
@@ -453,9 +396,7 @@ function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
 
   return {
     fx: fObjX + factorAtenuacion * fIntX + fColX,
-    fy: fObjY + factorAtenuacion * fIntY + fColY,
-    dMin: dMinLocal,
-    activation: maxActLocal
+    fy: fObjY + factorAtenuacion * fIntY + fColY
   };
 }
 
@@ -473,16 +414,9 @@ const rBadge = document.getElementById('rBadge');
 const pauseBtn = document.getElementById('pauseBtn');
 const resetBtn = document.getElementById('resetBtn');
 
-const dMinVal = document.getElementById('dMinVal');
-const timeVal = document.getElementById('timeVal');
-const mamdaniVal = document.getElementById('mamdaniVal');
-const robotsCountSub = document.getElementById('robotsCountSub');
-const invasionsSub = document.getElementById('invasionsSub');
-
 let swarms = [];
 let simTime = 0;
 let paused = false;
-let thresholdInvasions = 0;
 let isDraggingGoal = false;
 
 const PIXELS_PER_METER = 34;
@@ -524,7 +458,6 @@ function initSimulation() {
   canvas.width = canvasBox.clientWidth;
   canvas.height = canvasBox.clientHeight;
   simTime = 0;
-  thresholdInvasions = 0;
 
   const n = parseInt(nSlider.value, 10);
 
@@ -533,9 +466,6 @@ function initSimulation() {
     createSwarm(2, '#f48fb1', 7.2, -3.2, -7.2, 3.2, n),
     createSwarm(3, '#81c995', 0, 4.2, 0, -4.2, n)
   ];
-
-  robotsCountSub.textContent = `${n * swarms.length} robots activos (3 grupos)`;
-  invasionsSub.textContent = `0 invasiones de umbral`;
 }
 
 function stepPhysics(dt) {
@@ -544,19 +474,11 @@ function stepPhysics(dt) {
     rSensor: parseFloat(rSlider.value)
   };
 
-  let globalDMin = Infinity;
-  let sumActivation = 0;
-  let totalAgents = 0;
-
   const computed = [];
   for (let s = 0; s < swarms.length; s++) {
     computed[s] = [];
     for (let a = 0; a < swarms[s].agents.length; a++) {
-      const res = calcularFuerzasAgente(swarms[s].agents[a], swarms[s], swarms, params);
-      computed[s][a] = res;
-      if (res.dMin < globalDMin) globalDMin = res.dMin;
-      sumActivation += res.activation;
-      totalAgents++;
+      computed[s][a] = calcularFuerzasAgente(swarms[s].agents[a], swarms[s], swarms, params);
     }
   }
 
@@ -585,16 +507,6 @@ function stepPhysics(dt) {
   }
 
   simTime += dt;
-  const avgActPct = Math.round((sumActivation / Math.max(1, totalAgents)) * 100);
-
-  if (globalDMin < 2 * R_ROBOT) {
-    thresholdInvasions++;
-  }
-
-  timeVal.textContent = `${simTime.toFixed(1)} s`;
-  dMinVal.textContent = isFinite(globalDMin) ? `${globalDMin.toFixed(2)} m` : '-- m';
-  mamdaniVal.textContent = `${avgActPct} %`;
-  invasionsSub.textContent = `${thresholdInvasions} invasiones de umbral`;
 }
 
 function drawScene() {
