@@ -1,298 +1,749 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evasión Multi-Enjambre Difusa</title>
-    <style>
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; background-color: #111;
-            font-family: 'Segoe UI', sans-serif; color: #eee;
-        }
-        canvas { display: block; }
-        #ui-panel {
-            position: absolute; top: 20px; left: 20px; width: 340px;
-            background: rgba(20, 20, 25, 0.6);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px; padding: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 10;
-        }
-        h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
-        .control-group { margin-bottom: 15px; }
-        .control-group label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; }
-        input[type="range"] { width: 100%; cursor: pointer; }
-        .desc { font-size: 0.7rem; color: #999; display: block; margin-top: -3px; margin-bottom: 5px; }
-        .legend { display: flex; justify-content: space-around; margin-top: 15px; font-size: 0.8rem; }
-        .legend-item { display: flex; align-items: center; gap: 5px; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enjambres con Inferencia Difusa Híbrida</title>
+<style>
+  :root {
+    --bg-app: #121316;
+    --bg-card: #1b1c20;
+    --bg-canvas: #141518;
+    --bg-pill: #25272c;
+    --border-subtle: #2b2d33;
+    --text-primary: #f1f3f5;
+    --text-secondary: #9aa0a6;
+    --accent-blue: #4f7df3;
+    --swarm-blue: #8ab4f8;
+    --swarm-magenta: #f48fb1;
+    --swarm-green: #81c995;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+    min-height: 100vh;
+  }
+
+  .app-shell {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 18px;
+    padding: 18px 22px;
+  }
+
+  /* Header Card */
+  .header-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+
+  .divider {
+    height: 1px;
+    background-color: var(--border-subtle);
+    margin-bottom: 14px;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .metric-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .metric-value {
+    font-size: 1.35rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 3px;
+  }
+
+  .metric-sub {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  /* Canvas Card */
+  .canvas-card {
+    padding: 14px;
+  }
+
+  .canvas-container {
+    position: relative;
+    width: 100%;
+    height: 360px;
+    background-color: var(--bg-canvas);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    cursor: crosshair;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 0.8rem;
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .canvas-hint {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+
+  /* Controls Card */
+  .sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 18px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.82rem;
+  }
+
+  .value-badge {
+    background-color: var(--bg-pill);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #3c4043;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 4px;
+    height: 16px;
+    background: #ffffff;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .footer-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .footer-info {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-subtle);
+    background-color: var(--bg-pill);
+    color: var(--text-primary);
+  }
+
+  .btn-action.primary {
+    background-color: #283559;
+    border-color: var(--accent-blue);
+    color: #d2e3fc;
+  }
+
+  @media (max-width: 600px) {
+    .metrics-grid, .sliders-grid { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
 <body>
 
-    <div id="ui-panel">
-        <h2>Dinámica Multi-Enjambre</h2>
-        
-        <div class="control-group">
-            <label><span>Robots por Grupo</span> <span id="val-robots">15</span></label>
-            <input type="range" id="slider-robots" min="1" max="25" value="15">
-        </div>
+<div class="app-shell">
+  <!-- Panel Superior: Título y Telemetría -->
+  <div class="card">
+    <div class="header-title">Enjambres con Inferencia Difusa Híbrida</div>
 
-        <div class="control-group">
-            <label><span>Fuerza a Objetivo</span> <span id="val-meta">1.0</span></label>
-            <span class="desc">Atracción hacia su respectiva meta</span>
-            <input type="range" id="slider-meta" min="0" max="3" step="0.1" value="1.0">
-        </div>
+    <div class="divider"></div>
 
-        <div class="control-group">
-            <label><span>Cohesión Interna (Mamdani)</span> <span id="val-interna">1.0</span></label>
-            <span class="desc">Fuerza para mantenerse en grupo</span>
-            <input type="range" id="slider-interna" min="0" max="3" step="0.1" value="1.0">
-        </div>
+    <div class="metrics-grid">
+      <div>
+        <div class="metric-label">Distancia mínima d<sub>min</sub></div>
+        <div class="metric-value" id="dMinVal">-- m</div>
+        <div class="metric-sub">Umbral colisión 2R = 0.50 m</div>
+      </div>
+      <div>
+        <div class="metric-label">Tiempo de misión</div>
+        <div class="metric-value" id="timeVal">0.0 s</div>
+        <div class="metric-sub" id="robotsCountSub">6 robots activos (3 grupos)</div>
+      </div>
+      <div>
+        <div class="metric-label">Activación Mamdani</div>
+        <div class="metric-value" id="mamdaniVal">0 %</div>
+        <div class="metric-sub" id="invasionsSub">0 invasiones de umbral</div>
+      </div>
+    </div>
+  </div>
 
-        <div class="control-group">
-            <label><span>Repulsión Inter-Grupo (T-S)</span> <span id="val-externa">2.0</span></label>
-            <span class="desc">Prioridad agresiva anti-choques externos</span>
-            <input type="range" id="slider-externa" min="0" max="5" step="0.1" value="2.0">
-        </div>
+  <!-- Panel Central: Lienzo de Simulación -->
+  <div class="card canvas-card">
+    <div class="canvas-container" id="canvasBox">
+      <canvas id="simCanvas"></canvas>
+    </div>
+    <div class="legend-row">
+      <div class="legend-item"><span class="legend-dot" style="background:#8ab4f8"></span>Enjambre 1 (Azul - meta móvil)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#f48fb1"></span>Enjambre 2 (Magenta)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#81c995"></span>Enjambre 3 (Verde)</div>
+    </div>
+    <div class="canvas-hint">Clic o arrastre en el lienzo para reubicar meta Azul</div>
+  </div>
 
-        <div class="legend">
-            <div class="legend-item"><div class="dot" style="background: #00a8ff;"></div> Enjambre A</div>
-            <div class="legend-item"><div class="dot" style="background: #ff4757;"></div> Enjambre B</div>
+  <!-- Panel Inferior: Parámetros y Controles -->
+  <div class="card">
+    <div class="sliders-grid">
+      <div>
+        <div class="slider-header">
+          <span>Robots por enjambre (N)</span>
+          <span class="value-badge" id="nBadge">2</span>
         </div>
-        <p style="font-size: 0.7rem; color: #888; text-align: center; margin-top: 15px;">Puedes arrastrar las metas (círculos grandes) con el ratón.</p>
+        <input type="range" id="nSlider" min="1" max="5" step="1" value="2">
+      </div>
+      <div>
+        <div class="slider-header">
+          <span>Rango sensor difuso (r<sub>sens</sub>)</span>
+          <span class="value-badge" id="rBadge">1.5 m</span>
+        </div>
+        <input type="range" id="rSlider" min="1.5" max="2.5" step="0.1" value="1.5">
+      </div>
     </div>
 
-    <canvas id="simCanvas"></canvas>
+    <div class="footer-controls">
+      <div class="footer-info">Radio físico R = 0.25 m · Halo líder = r<sub>sens</sub></div>
+      <div class="action-buttons">
+        <button class="btn-action primary" id="pauseBtn">❚❚ Pausar</button>
+        <button class="btn-action" id="resetBtn">↻ Reiniciar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.addEventListener('resize', resize);
-        resize();
+<script>
+// ============================================================================
+// 1. FUNCIONES DE PERTENENCIA DIFUSA
+// ============================================================================
+function trimf(x, a, b, c) {
+  return Math.max(Math.min((x - a) / (b - a + 1e-6), (c - x) / (c - b + 1e-6)), 0);
+}
 
-        let numPorGrupo = 15;
-        let factorMeta = 1.0;
-        let factorInterno = 1.0;
-        let factorExterno = 2.0;
+function trapmf(x, a, b, c, d) {
+  return Math.max(Math.min(Math.min((x - a) / (b - a + 1e-6), 1), (d - x) / (d - c + 1e-6)), 0);
+}
 
-        document.getElementById('slider-robots').oninput = e => { numPorGrupo = parseInt(e.target.value); document.getElementById('val-robots').innerText = numPorGrupo; ajustarAgentes(); };
-        document.getElementById('slider-meta').oninput = e => { factorMeta = parseFloat(e.target.value); document.getElementById('val-meta').innerText = factorMeta.toFixed(1); };
-        document.getElementById('slider-interna').oninput = e => { factorInterno = parseFloat(e.target.value); document.getElementById('val-interna').innerText = factorInterno.toFixed(1); };
-        document.getElementById('slider-externa').oninput = e => { factorExterno = parseFloat(e.target.value); document.getElementById('val-externa').innerText = factorExterno.toFixed(1); };
+function wrapToPi(angle) {
+  while (angle > Math.PI) angle -= 2 * Math.PI;
+  while (angle < -Math.PI) angle += 2 * Math.PI;
+  return angle;
+}
 
-        const EQUIPOS = [
-            { id: 0, color: '#00a8ff', metaColor: 'rgba(0, 168, 255, 0.3)' },
-            { id: 1, color: '#ff4757', metaColor: 'rgba(255, 71, 87, 0.3)' }
-        ];
+// ============================================================================
+// 2. SISTEMA DE INFERENCIA MAMDANI (Escalado dinámicamente a rSens: 1.5 - 2.5 m)
+// ============================================================================
+function fisMamdaniEvasion(d, theta, rSens) {
+  const muDCritica = trapmf(d, 0, 0, 0.45 * rSens, 0.70 * rSens);
+  const muDCerca   = trimf(d, 0.50 * rSens, 0.75 * rSens, 0.95 * rSens);
+  const muDLejos   = trapmf(d, 0.85 * rSens, 0.98 * rSens, rSens + 1, rSens + 1);
 
-        class Meta {
-            constructor(equipo, x, y) {
-                this.equipo = equipo;
-                this.x = x; this.y = y;
-                this.radius = 30;
-                this.vx = (Math.random() - 0.5) * 1.5;
-                this.vy = (Math.random() - 0.5) * 1.5;
-                this.isDragging = false;
-            }
-            update() {
-                if (!this.isDragging) {
-                    this.x += this.vx; this.y += this.vy;
-                    if (this.x < 50 || this.x > canvas.width - 50) this.vx *= -1;
-                    if (this.y < 50 || this.y > canvas.height - 50) this.vy *= -1;
-                }
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
-                ctx.fillStyle = EQUIPOS[this.equipo].metaColor;
-                ctx.fill();
-                ctx.strokeStyle = EQUIPOS[this.equipo].color;
-                ctx.lineWidth = 2; ctx.stroke();
-                
-                // Icono cruz
-                ctx.beginPath();
-                ctx.moveTo(this.x - 10, this.y); ctx.lineTo(this.x + 10, this.y);
-                ctx.moveTo(this.x, this.y - 10); ctx.lineTo(this.x, this.y + 10);
-                ctx.stroke();
-            }
+  const muThIzq     = trapmf(theta, 0.2, 0.6, Math.PI, Math.PI);
+  const muThFrontal = trimf(theta, -0.5, 0, 0.5);
+  const muThDer     = trapmf(theta, -Math.PI, -Math.PI, -0.6, -0.2);
+
+  // Reglas difusas
+  const w1 = Math.min(muDCritica, muThFrontal);
+  const w2 = Math.min(muDCritica, muThIzq);
+  const w3 = Math.min(muDCritica, muThDer);
+  const w4 = Math.min(muDCerca, muThFrontal);
+  const w5 = Math.min(muDCerca, Math.max(muThIzq, muThDer));
+  const w6 = muDLejos;
+
+  const activation = Math.max(w1, w2, w3, w4, w5);
+
+  // Defuzzificación por centroide (Magnitud)
+  let numMag = 0, denMag = 0;
+  const steps = 36;
+  for (let s = 0; s <= steps; s++) {
+    const u = (8 * s) / steps;
+    const agg = Math.max(
+      Math.min(w6, trimf(u, -0.5, 0, 1.0)),
+      Math.min(w5, trimf(u, 0.5, 2.0, 3.5)),
+      Math.min(w4, trimf(u, 2.5, 4.5, 6.5)),
+      Math.min(Math.max(w1, w2, w3), trapmf(u, 5.0, 6.5, 8.0, 8.0))
+    );
+    numMag += u * agg;
+    denMag += agg;
+  }
+  const magSalida = denMag === 0 ? 0 : numMag / denMag;
+
+  // Defuzzificación por centroide (Ángulo de desvío tangencial)
+  let numAng = 0, denAng = 0;
+  for (let s = 0; s <= steps; s++) {
+    const u = -Math.PI / 2 + (Math.PI * s) / steps;
+    const agg = Math.max(
+      Math.min(Math.max(w1, w2), trimf(u, -Math.PI / 2, -Math.PI / 3, -Math.PI / 6)),
+      Math.min(w4, trimf(u, -Math.PI / 3, -Math.PI / 6, 0)),
+      Math.min(Math.max(w5, w6), trimf(u, -0.1, 0, 0.1)),
+      Math.min(w3, trimf(u, 0, Math.PI / 6, Math.PI / 3))
+    );
+    numAng += u * agg;
+    denAng += agg;
+  }
+  const angSalida = denAng === 0 ? 0 : numAng / denAng;
+
+  return { mag: magSalida, ang: angSalida, activation };
+}
+
+// ============================================================================
+// 3. SISTEMA TAKAGI-SUGENO (Fuerzas internas y navegación al objetivo)
+// ============================================================================
+function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
+  const { dFormacion, rSensor } = params;
+
+  // A. Atracción al objetivo (T-S de primer orden)
+  const dxG = agent.goal.x - agent.x;
+  const dyG = agent.goal.y - agent.y;
+  const distGoal = Math.hypot(dxG, dyG);
+  const dirGx = dxG / (distGoal + 1e-6);
+  const dirGy = dyG / (distGoal + 1e-6);
+
+  const muGCerca = trimf(distGoal, -0.1, 0, 2.2);
+  const muGLejos = trapmf(distGoal, 1.4, 2.8, 100, 100);
+
+  const fTsCerca = 1.3 * distGoal;
+  const fTsLejos = 0.12 * distGoal + 2.1;
+  const magFObj = (muGCerca * fTsCerca + muGLejos * fTsLejos) / (muGCerca + muGLejos + 1e-6);
+
+  const fObjX = magFObj * dirGx;
+  const fObjY = magFObj * dirGy;
+
+  // B. Cohesión y separación interna (T-S de primer orden)
+  let fIntX = 0, fIntY = 0;
+  for (const mate of ownSwarm.agents) {
+    if (mate === agent) continue;
+    const dx = mate.x - agent.x;
+    const dy = mate.y - agent.y;
+    const d = Math.hypot(dx, dy);
+    const errD = d - dFormacion;
+
+    const muMuyCerca = trapmf(errD, -10, -10, -0.35, 0);
+    const muOptimo   = trimf(errD, -0.35, 0, 0.55);
+    const muLejos    = trapmf(errD, 0.2, 0.9, 20, 20);
+
+    const uRep = 3.8 * errD;
+    const uOpt = 0.2 * errD;
+    const uCoh = 0.9 * errD + 0.35;
+
+    const magInt = (muMuyCerca * uRep + muOptimo * uOpt + muLejos * uCoh) /
+                   (muMuyCerca + muOptimo + muLejos + 1e-6);
+
+    fIntX += magInt * (dx / (d + 1e-6));
+    fIntY += magInt * (dy / (d + 1e-6));
+  }
+
+  // C. Evasión inter-enjambre (Mamdani)
+  let fColX = 0, fColY = 0;
+  let dMinLocal = Infinity;
+  let maxActLocal = 0;
+
+  for (const otherSwarm of allSwarms) {
+    if (otherSwarm.id === ownSwarm.id) continue;
+    for (const intruder of otherSwarm.agents) {
+      const dx = intruder.x - agent.x;
+      const dy = intruder.y - agent.y;
+      const d = Math.hypot(dx, dy);
+      if (d < dMinLocal) dMinLocal = d;
+
+      if (d < rSensor) {
+        const vNorm = Math.hypot(agent.vx, agent.vy);
+        const angV = vNorm > 0.05 ? Math.atan2(agent.vy, agent.vx) : Math.atan2(dirGy, dirGx);
+        const angK = Math.atan2(dy, dx);
+        const thetaRel = wrapToPi(angK - angV);
+
+        const { mag, ang, activation } = fisMamdaniEvasion(d, thetaRel, rSensor);
+        if (activation > maxActLocal) maxActLocal = activation;
+
+        const repX = -dx / (d + 1e-6);
+        const repY = -dy / (d + 1e-6);
+        const cosA = Math.cos(ang);
+        const sinA = Math.sin(ang);
+
+        fColX += mag * (repX * cosA - repY * sinA);
+        fColY += mag * (repX * sinA + repY * cosA);
+      }
+    }
+  }
+
+  const magCol = Math.hypot(fColX, fColY);
+  const factorAtenuacion = 1 / (1 + 0.45 * magCol);
+
+  return {
+    fx: fObjX + factorAtenuacion * fIntX + fColX,
+    fy: fObjY + factorAtenuacion * fIntY + fColY,
+    dMin: dMinLocal,
+    activation: maxActLocal
+  };
+}
+
+// ============================================================================
+// 4. ESTADO DE SIMULACIÓN, RENDERIZADO Y CONTROLES (Triple Enjambre por defecto)
+// ============================================================================
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const canvasBox = document.getElementById('canvasBox');
+
+const nSlider = document.getElementById('nSlider');
+const rSlider = document.getElementById('rSlider');
+const nBadge = document.getElementById('nBadge');
+const rBadge = document.getElementById('rBadge');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+const dMinVal = document.getElementById('dMinVal');
+const timeVal = document.getElementById('timeVal');
+const mamdaniVal = document.getElementById('mamdaniVal');
+const robotsCountSub = document.getElementById('robotsCountSub');
+const invasionsSub = document.getElementById('invasionsSub');
+
+let swarms = [];
+let simTime = 0;
+let paused = false;
+let thresholdInvasions = 0;
+let isDraggingGoal = false;
+
+const PIXELS_PER_METER = 34;
+const R_ROBOT = 0.25;
+const V_MAX = 1.85;
+
+function worldToScreen(wx, wy) {
+  return {
+    x: canvas.width / 2 + wx * PIXELS_PER_METER,
+    y: canvas.height / 2 - wy * PIXELS_PER_METER
+  };
+}
+
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - canvas.width / 2) / PIXELS_PER_METER,
+    y: (canvas.height / 2 - sy) / PIXELS_PER_METER
+  };
+}
+
+function createSwarm(id, color, startX, startY, goalX, goalY, count) {
+  const agents = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (2 * Math.PI * i) / count + 0.3;
+    const rad = count === 1 ? 0 : 0.45 + (i % 3) * 0.22;
+    agents.push({
+      x: startX + Math.cos(angle) * rad,
+      y: startY + Math.sin(angle) * rad,
+      vx: 0,
+      vy: 0,
+      goal: { x: goalX, y: goalY },
+      trail: []
+    });
+  }
+  return { id, color, goal: { x: goalX, y: goalY }, agents };
+}
+
+function initSimulation() {
+  canvas.width = canvasBox.clientWidth;
+  canvas.height = canvasBox.clientHeight;
+  simTime = 0;
+  thresholdInvasions = 0;
+
+  const n = parseInt(nSlider.value, 10);
+
+  swarms = [
+    createSwarm(1, '#8ab4f8', -7.2, -3.2, 7.2, 3.2, n),
+    createSwarm(2, '#f48fb1', 7.2, -3.2, -7.2, 3.2, n),
+    createSwarm(3, '#81c995', 0, 4.2, 0, -4.2, n)
+  ];
+
+  robotsCountSub.textContent = `${n * swarms.length} robots activos (3 grupos)`;
+  invasionsSub.textContent = `0 invasiones de umbral`;
+}
+
+function stepPhysics(dt) {
+  const params = {
+    dFormacion: 0.95,
+    rSensor: parseFloat(rSlider.value)
+  };
+
+  let globalDMin = Infinity;
+  let sumActivation = 0;
+  let totalAgents = 0;
+
+  const computed = [];
+  for (let s = 0; s < swarms.length; s++) {
+    computed[s] = [];
+    for (let a = 0; a < swarms[s].agents.length; a++) {
+      const res = calcularFuerzasAgente(swarms[s].agents[a], swarms[s], swarms, params);
+      computed[s][a] = res;
+      if (res.dMin < globalDMin) globalDMin = res.dMin;
+      sumActivation += res.activation;
+      totalAgents++;
+    }
+  }
+
+  for (let s = 0; s < swarms.length; s++) {
+    for (let a = 0; a < swarms[s].agents.length; a++) {
+      const ag = swarms[s].agents[a];
+      const f = computed[s][a];
+
+      ag.vx += f.fx * dt;
+      ag.vy += f.fy * dt;
+
+      const speed = Math.hypot(ag.vx, ag.vy);
+      if (speed > V_MAX) {
+        ag.vx = (ag.vx / speed) * V_MAX;
+        ag.vy = (ag.vy / speed) * V_MAX;
+      }
+
+      ag.x += ag.vx * dt;
+      ag.y += ag.vy * dt;
+
+      if (Math.floor(simTime * 30) % 2 === 0) {
+        ag.trail.push({ x: ag.x, y: ag.y });
+        if (ag.trail.length > 42) ag.trail.shift();
+      }
+    }
+  }
+
+  simTime += dt;
+  const avgActPct = Math.round((sumActivation / Math.max(1, totalAgents)) * 100);
+
+  if (globalDMin < 2 * R_ROBOT) {
+    thresholdInvasions++;
+  }
+
+  timeVal.textContent = `${simTime.toFixed(1)} s`;
+  dMinVal.textContent = isFinite(globalDMin) ? `${globalDMin.toFixed(2)} m` : '-- m';
+  mamdaniVal.textContent = `${avgActPct} %`;
+  invasionsSub.textContent = `${thresholdInvasions} invasiones de umbral`;
+}
+
+function drawScene() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 1. Cuadrícula de fondo (1 metro por celda)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.lineWidth = 1;
+  const step = PIXELS_PER_METER;
+  for (let x = (canvas.width / 2) % step; x < canvas.width; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = (canvas.height / 2) % step; y < canvas.height; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // 2. Barra de escala "2.0 m" en esquina inferior izquierda
+  const scaleX = 24;
+  const scaleY = canvas.height - 20;
+  const barW = 2.0 * PIXELS_PER_METER;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(scaleX, scaleY); ctx.lineTo(scaleX + barW, scaleY);
+  ctx.moveTo(scaleX, scaleY - 4); ctx.lineTo(scaleX, scaleY + 4);
+  ctx.moveTo(scaleX + barW, scaleY - 4); ctx.lineTo(scaleX + barW, scaleY + 4);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.font = '11px monospace';
+  ctx.fillText('2.0 m', scaleX + barW + 8, scaleY + 4);
+
+  const rSensorPx = parseFloat(rSlider.value) * PIXELS_PER_METER;
+
+  // 3. Dibujar enjambres
+  for (const swarm of swarms) {
+    if (swarm.agents.length > 0) {
+      const leaderPos = worldToScreen(swarm.agents[0].x, swarm.agents[0].y);
+      ctx.save();
+      ctx.fillStyle = swarm.color + '12';
+      ctx.strokeStyle = swarm.color + '40';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(leaderPos.x, leaderPos.y, rSensorPx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const ag of swarm.agents) {
+      if (ag.trail.length > 1) {
+        ctx.strokeStyle = swarm.color + '45';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        const p0 = worldToScreen(ag.trail[0].x, ag.trail[0].y);
+        ctx.moveTo(p0.x, p0.y);
+        for (let k = 1; k < ag.trail.length; k++) {
+          const pk = worldToScreen(ag.trail[k].x, ag.trail[k].y);
+          ctx.lineTo(pk.x, pk.y);
         }
+        ctx.stroke();
+      }
+    }
 
-        class Agente {
-            constructor(equipo, x, y) {
-                this.equipo = equipo;
-                this.x = x; this.y = y;
-                this.vx = 0; this.vy = 0;
-                this.radius = 12; // Aumentado para visualizar mejor los detalles
-                this.maxSpeed = 3.0;
-                this.color = EQUIPOS[equipo].color;
-                this.fuerzaExternaActiva = false; 
-            }
+    const gPos = worldToScreen(swarm.goal.x, swarm.goal.y);
+    ctx.strokeStyle = swarm.color + 'cc';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(gPos.x, gPos.y, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gPos.x - 5, gPos.y); ctx.lineTo(gPos.x + 5, gPos.y);
+    ctx.moveTo(gPos.x, gPos.y - 5); ctx.lineTo(gPos.x, gPos.y + 5);
+    ctx.stroke();
 
-            update(agentes, metas) {
-                let f_meta = {x: 0, y: 0};
-                let f_interna = {x: 0, y: 0};
-                let f_externa = {x: 0, y: 0};
-                this.fuerzaExternaActiva = false;
+    const rPx = Math.max(6.5, R_ROBOT * PIXELS_PER_METER);
+    for (const ag of swarm.agents) {
+      const pos = worldToScreen(ag.x, ag.y);
+      ctx.fillStyle = swarm.color;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, rPx, 0, Math.PI * 2);
+      ctx.fill();
 
-                // 1. Fuerza hacia su meta
-                let meta = metas[this.equipo];
-                let dxM = meta.x - this.x; let dyM = meta.y - this.y;
-                let distM = Math.sqrt(dxM*dxM + dyM*dyM);
-                if (distM > 0) {
-                    f_meta.x = (dxM / distM) * 0.5 * factorMeta;
-                    f_meta.y = (dyM / distM) * 0.5 * factorMeta;
-                }
+      ctx.strokeStyle = '#121316';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+}
 
-                // Comparar con todos los demás agentes
-                for (let a of agentes) {
-                    if (a === this) continue;
-                    let dx = this.x - a.x; let dy = this.y - a.y;
-                    let dist = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (dist === 0) dist = 0.1;
+function animate() {
+  if (!paused) {
+    stepPhysics(0.025);
+  }
+  drawScene();
+  requestAnimationFrame(animate);
+}
 
-                    if (a.equipo === this.equipo) {
-                        // 2. Fuerza Interna (Cohesión/Separación)
-                        if (dist < 40) { 
-                            f_interna.x += (dx / dist) * 1.5;
-                            f_interna.y += (dy / dist) * 1.5;
-                        } else if (dist < 120) { 
-                            f_interna.x -= (dx / dist) * 0.2;
-                            f_interna.y -= (dy / dist) * 0.2;
-                        }
-                    } else {
-                        // 3. Fuerza Externa inter-enjambre (Takagi-Sugeno)
-                        if (dist < 70) {
-                            this.fuerzaExternaActiva = true;
-                            let fuerzaTS = Math.pow((70 - dist) / 70, 2) * 5; 
-                            f_externa.x += (dx / dist) * fuerzaTS;
-                            f_externa.y += (dy / dist) * fuerzaTS;
-                            
-                            // Visualizar el choque difuso
-                            ctx.beginPath();
-                            ctx.moveTo(this.x, this.y); ctx.lineTo(a.x, a.y);
-                            ctx.strokeStyle = `rgba(255, 50, 50, ${fuerzaTS / 5})`;
-                            ctx.lineWidth = 1.5; ctx.stroke();
-                        }
-                    }
-                }
+// ============================================================================
+// 5. EVENTOS DE INTERFAZ Y ARRASTRE DE META AZUL
+// ============================================================================
+nSlider.addEventListener('input', () => {
+  nBadge.textContent = nSlider.value;
+  initSimulation();
+});
 
-                f_interna.x *= factorInterno * 0.1;
-                f_interna.y *= factorInterno * 0.1;
-                f_externa.x *= factorExterno;
-                f_externa.y *= factorExterno;
+rSlider.addEventListener('input', () => {
+  rBadge.textContent = `${parseFloat(rSlider.value).toFixed(1)} m`;
+});
 
-                let reduccionMeta = this.fuerzaExternaActiva ? 0.2 : 1.0;
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.innerHTML = paused ? '▶ Reanudar' : '❚❚ Pausar';
+});
 
-                this.vx += (f_meta.x * reduccionMeta) + f_interna.x + f_externa.x;
-                this.vy += (f_meta.y * reduccionMeta) + f_interna.y + f_externa.y;
+resetBtn.addEventListener('click', initSimulation);
 
-                this.vx *= 0.95; this.vy *= 0.95;
-                let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
-                if (speed > this.maxSpeed) {
-                    this.vx = (this.vx / speed) * this.maxSpeed;
-                    this.vy = (this.vy / speed) * this.maxSpeed;
-                }
+function updateBlueGoalFromEvent(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const world = screenToWorld(sx, sy);
+  if (swarms.length > 0) {
+    swarms[0].goal = world;
+    swarms[0].agents.forEach(ag => ag.goal = world);
+  }
+}
 
-                this.x += this.vx; this.y += this.vy;
-            }
+canvas.addEventListener('mousedown', (e) => {
+  isDraggingGoal = true;
+  updateBlueGoalFromEvent(e);
+});
 
-            draw() {
-                let angle = Math.atan2(this.vy, this.vx);
-                ctx.translate(this.x, this.y);
-                ctx.rotate(angle);
-                
-                // Sombra suave
-                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = -2;
-                ctx.shadowOffsetY = 3;
-                
-                // Cuerpo circular
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-                
-                // Borde blanco
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
+window.addEventListener('mousemove', (e) => {
+  if (isDraggingGoal) updateBlueGoalFromEvent(e);
+});
 
-                ctx.shadowColor = "transparent";
+window.addEventListener('mouseup', () => {
+  isDraggingGoal = false;
+});
 
-                // Línea direccional interna
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(this.radius, 0);
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                
-                // Antena en la punta
-                ctx.beginPath();
-                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
+window.addEventListener('resize', () => {
+  canvas.width = canvasBox.clientWidth;
+  canvas.height = canvasBox.clientHeight;
+});
 
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-            }
-        }
-
-        let agentes = [];
-        let metas = [];
-        let dragMeta = null;
-
-        function init() {
-            metas.push(new Meta(0, canvas.width * 0.2, canvas.height * 0.5));
-            metas.push(new Meta(1, canvas.width * 0.8, canvas.height * 0.5));
-            ajustarAgentes();
-        }
-
-        function ajustarAgentes() {
-            agentes = [];
-            for(let eq = 0; eq < 2; eq++) {
-                let startX = eq === 0 ? canvas.width * 0.8 : canvas.width * 0.2;
-                for (let i = 0; i < numPorGrupo; i++) {
-                    agentes.push(new Agente(eq, startX + (Math.random()-0.5)*150, canvas.height/2 + (Math.random()-0.5)*150));
-                }
-            }
-        }
-
-        canvas.addEventListener('mousedown', e => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
-            for (let m of metas) {
-                if (Math.hypot(mouseX - m.x, mouseY - m.y) <= m.radius) {
-                    dragMeta = m; m.isDragging = true; canvas.style.cursor = 'grabbing'; break;
-                }
-            }
-        });
-        canvas.addEventListener('mousemove', e => {
-            if (dragMeta) {
-                const rect = canvas.getBoundingClientRect();
-                dragMeta.x = e.clientX - rect.left; dragMeta.y = e.clientY - rect.top;
-            }
-        });
-        window.addEventListener('mouseup', () => {
-            if (dragMeta) { dragMeta.isDragging = false; dragMeta = null; canvas.style.cursor = 'default'; }
-        });
-
-        function animate() {
-            ctx.fillStyle = "rgba(17, 17, 17, 0.4)"; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            for (let m of metas) { m.update(); m.draw(); }
-            for (let a of agentes) { a.update(agentes, metas); a.draw(); }
-
-            requestAnimationFrame(animate);
-        }
-
-        init();
-        animate();
-    </script>
+initSimulation();
+animate();
+</script>
 </body>
 </html>
