@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de Lógica Difusa: Evasión de Obstáculos</title>
+  <style>
+    :root {
+      --bg-main: #0b0c0e;
+      --bg-card: #15171a;
+      --bg-panel: #191c20;
+      --border-subtle: #26292e;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --accent-blue: #93c5fd;
+      --accent-indigo: #a5b4fc;
+      --accent-green: #34d399;
+      --accent-lime: #bef264;
+      --rule-active-bg: #13254b;
+      --rule-active-border: #3b82f6;
+      --rule-inactive-bg: #1a1c20;
+      --rule-inactive-border: #2a2d34;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    header p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* Grid superior: Radar y Respuesta de Motores */
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 680px) {
+      .top-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-subtitle {
+      font-size: 0.78rem;
+      font-style: italic;
+      color: var(--text-secondary);
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background-color: #1e293b;
+      color: #60a5fa;
+      border: 1px solid #2563eb55;
+      transition: all 0.2s ease;
+    }
+
+    .badge.danger {
+      background-color: #450a0a;
+      color: #f87171;
+      border-color: #dc262666;
+    }
+
+    .badge.safe {
+      background-color: #064e3b;
+      color: #34d399;
+      border-color: #05966966;
+    }
+
+    .badge.neutral {
+      background-color: #27272a;
+      color: #d4d4d8;
+      border-color: #3f3f46;
+    }
+
+    /* Contenedor del Canvas del Radar Interactivo */
+    .radar-box {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      height: 225px;
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .radar-hint {
+      position: absolute;
+      bottom: 8px;
+      left: 12px;
+      font-size: 0.72rem;
+      color: #6b7280;
+      pointer-events: none;
+    }
+
+    /* Barras de motores y fuzzificación */
+    .metric-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 125px 1fr 48px;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+    }
+
+    .metric-label {
+      color: var(--text-secondary);
+    }
+
+    .metric-value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background-color: #22252a;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.06s ease-out;
+    }
+
+    .divider {
+      border: 0;
+      border-top: 1px solid var(--border-subtle);
+      margin: 18px 0;
+    }
+
+    .section-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 12px;
+    }
+
+    /* Matriz de Inferencia Difusa */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .rules-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .rule-box {
+      background-color: var(--rule-inactive-bg);
+      border: 1.5px solid var(--rule-inactive-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: all 0.15s ease;
+    }
+
+    .rule-box.active {
+      background-color: var(--rule-active-bg);
+      border-color: var(--rule-active-border);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.18);
+    }
+
+    .rule-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .rule-box.active .rule-name {
+      color: #bfdbfe;
+    }
+
+    .rule-weight {
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #6b7280;
+    }
+
+    .rule-box.active .rule-weight {
+      color: #93c5fd;
+    }
+
+    /* Panel de Telemetría de Entrada (Sin Sliders) */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .telemetry-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .telemetry-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+
+    .telemetry-info strong {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .telemetry-info span {
+      font-size: 0.78rem;
+      font-style: italic;
+      color: var(--text-secondary);
+    }
+
+    .telemetry-readout {
+      font-variant-numeric: tabular-nums;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      background-color: #13254b66;
+      border: 1px solid #3b82f644;
+      padding: 6px 12px;
+      border-radius: 8px;
+      min-width: 76px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Simulador de Lógica Difusa: Evasión de Obstáculos</h1>
+      <p>Haz clic o arrastra el obstáculo directamente dentro del radar con el mouse para observar la activación de reglas (If-Then) y el diferencial continuo de motores.</p>
+    </header>
+
+    <!-- Sección Superior -->
+    <div class="top-grid">
+      <!-- Panel Radar Interactivo -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Radar de Obstáculos</span>
+          <span id="status-badge" class="badge">Despejado</span>
+        </div>
+        <div class="radar-box">
+          <canvas id="radarCanvas" width="360" height="225"></canvas>
+          <span class="radar-hint">Arrastra el punto en el radar</span>
+        </div>
+      </div>
+
+      <!-- Panel Respuesta de Motores y Fuzzificación -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Respuesta de Motores</span>
+          <span id="action-badge" class="badge neutral">Avance Recto</span>
+        </div>
+
+        <div class="metric-group">
+          <div class="metric-row">
+            <span class="metric-label">Motor Izq (M1)</span>
+            <div class="progress-track">
+              <div id="bar-m1" class="progress-fill" style="width: 80%; background: var(--accent-blue);"></div>
+            </div>
+            <span id="val-m1" class="metric-value">80%</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">Motor Der (M2)</span>
+            <div class="progress-track">
+              <div id="bar-m2" class="progress-fill" style="width: 80%; background: var(--accent-indigo);"></div>
+            </div>
+            <span id="val-m2" class="metric-value">80%</span>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="section-label">Pertenencia de Entrada (Fuzzification)</div>
+        <div class="metric-group">
+          <div class="metric-row">
+            <span class="metric-label">Dist: Cerca / Far</span>
+            <div class="progress-track">
+              <div id="bar-fuzz-dist" class="progress-fill" style="width: 0%; background: var(--accent-green);"></div>
+            </div>
+            <span id="val-fuzz-dist" class="metric-value">0.00</span>
+          </div>
+
+          <div class="metric-row">
+            <span class="metric-label">Áng: Izq / Ctr / Der</span>
+            <div class="progress-track">
+              <div id="bar-fuzz-ang" class="progress-fill" style="width: 87%; background: var(--accent-lime);"></div>
+            </div>
+            <span id="val-fuzz-ang" class="metric-value">0.87</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matriz de Inferencia Difusa -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Matriz de Inferencia Difusa (Reglas Activas)</span>
+        <span class="card-subtitle">Ponderación por regla (AND = Min)</span>
+      </div>
+
+      <div class="rules-grid">
+        <div id="rule-r1" class="rule-box active">
+          <div class="rule-name">R1: Si Lejos</div>
+          <div id="w-r1" class="rule-weight">1.00</div>
+        </div>
+        <div id="rule-r2" class="rule-box">
+          <div class="rule-name">R2: Si Cerca & Centro</div>
+          <div id="w-r2" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r3" class="rule-box">
+          <div class="rule-name">R3: Si Cerca & Izquierda</div>
+          <div id="w-r3" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r4" class="rule-box">
+          <div class="rule-name">R4: Si Cerca & Derecha</div>
+          <div id="w-r4" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r5" class="rule-box">
+          <div class="rule-name">R5: Si Media & Centro</div>
+          <div id="w-r5" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r6" class="rule-box">
+          <div class="rule-name">R6: Si Media & Izquierda</div>
+          <div id="w-r6" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r7" class="rule-box">
+          <div class="rule-name">R7: Si Media & Derecha</div>
+          <div id="w-r7" class="rule-weight">0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lecturas de Sensores Controladas por Mouse -->
+    <div class="card">
+      <div class="telemetry-grid">
+        <div class="telemetry-item">
+          <div class="telemetry-info">
+            <strong>Distancia al Obstáculo</strong>
+            <span>Lectura de sensor sonar</span>
+          </div>
+          <div id="readout-dist" class="telemetry-readout">95 cm</div>
+        </div>
+
+        <div class="telemetry-item">
+          <div class="telemetry-info">
+            <strong>Ángulo de Impacto</strong>
+            <span>Orientación de la amenaza</span>
+          </div>
+          <div id="readout-ang" class="telemetry-readout">+4°</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Estado inicial de entrada (manipulable con el mouse en el radar)
+    let state = {
+      dist: 95,
+      ang: 4,
+      isDragging: false,
+      isHovering: false
+    };
+
+    // Elementos del DOM
+    const readoutDist = document.getElementById("readout-dist");
+    const readoutAng = document.getElementById("readout-ang");
+
+    const statusBadge = document.getElementById("status-badge");
+    const actionBadge = document.getElementById("action-badge");
+
+    const barM1 = document.getElementById("bar-m1");
+    const valM1 = document.getElementById("val-m1");
+    const barM2 = document.getElementById("bar-m2");
+    const valM2 = document.getElementById("val-m2");
+
+    const barFuzzDist = document.getElementById("bar-fuzz-dist");
+    const valFuzzDist = document.getElementById("val-fuzz-dist");
+    const barFuzzAng = document.getElementById("bar-fuzz-ang");
+    const valFuzzAng = document.getElementById("val-fuzz-ang");
+
+    const canvas = document.getElementById("radarCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Parámetros geométricos del radar
+    const RADAR = {
+      cx: canvas.width / 2,
+      cy: canvas.height - 38,
+      maxRadius: 155,
+      minRadius: 25
+    };
+
+    // Funciones de pertenencia (Triangulares / Trapezoidales)
+    function trapmf(x, a, b, c, d) {
+      if (x <= a || x >= d) return 0;
+      if (x >= b && x <= c) return 1;
+      if (x > a && x < b) return (x - a) / (b - a);
+      return (d - x) / (d - c);
+    }
+
+    function trimf(x, a, b, c) {
+      if (x <= a || x >= c) return 0;
+      if (x === b) return 1;
+      if (x > a && x < b) return (x - a) / (b - a);
+      return (c - x) / (c - b);
+    }
+
+    // Motor de inferencia difusa
+    function computeFuzzyLogic(dist, ang) {
+      // 1. Fuzzificación de Distancia (10 cm a 100 cm)
+      const muCerca = trapmf(dist, 0, 10, 22, 55);
+      const muMedia = trimf(dist, 22, 45, 70);
+      const muLejos = trapmf(dist, 40, 65, 100, 120);
+
+      // 2. Fuzzificación de Ángulo (-90° Izquierda a +90° Derecha)
+      const muIzq = trapmf(ang, -110, -90, -35, -5);
+      const muCtr = trimf(ang, -30, 0, 30);
+      const muDer = trapmf(ang, 5, 35, 90, 110);
+
+      // 3. Evaluación de Reglas (Operador AND = Math.min)
+      const rules = [
+        { id: "r1", w: muLejos,                 m1: 80, m2: 80 },
+        { id: "r2", w: Math.min(muCerca, muCtr), m1: 85, m2: 15 },
+        { id: "r3", w: Math.min(muCerca, muIzq), m1: 85, m2: 20 },
+        { id: "r4", w: Math.min(muCerca, muDer), m1: 20, m2: 85 },
+        { id: "r5", w: Math.min(muMedia, muCtr), m1: 75, m2: 40 },
+        { id: "r6", w: Math.min(muMedia, muIzq), m1: 78, m2: 48 },
+        { id: "r7", w: Math.min(muMedia, muDer), m1: 48, m2: 78 }
+      ];
+
+      // 4. Defuzzificación (Promedio Ponderado)
+      let sumW = 0;
+      let sumM1 = 0;
+      let sumM2 = 0;
+
+      rules.forEach((r) => {
+        sumW += r.w;
+        sumM1 += r.w * r.m1;
+        sumM2 += r.w * r.m2;
+      });
+
+      const outM1 = sumW > 0 ? Math.round(sumM1 / sumW) : 80;
+      const outM2 = sumW > 0 ? Math.round(sumM2 / sumW) : 80;
+
+      return {
+        muCerca,
+        muMedia,
+        muLejos,
+        muIzq,
+        muCtr,
+        muDer,
+        rules,
+        outM1,
+        outM2
+      };
+    }
+
+    // Convertir coordenadas del mouse en el canvas a (distancia, ángulo)
+    function updateFromPointer(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+
+      const dx = x - RADAR.cx;
+      const dy = y - RADAR.cy;
+
+      // Calcular ángulo en grados (-90° izquierda a +90° derecha)
+      let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+      if (angleDeg > 180) angleDeg -= 360;
+      angleDeg = Math.max(-90, Math.min(90, Math.round(angleDeg)));
+
+      // Calcular distancia radial y mapearla a [10 cm, 100 cm]
+      const pixelDist = Math.hypot(dx, dy);
+      const clampedRadius = Math.max(RADAR.minRadius, Math.min(RADAR.maxRadius, pixelDist));
+      const norm = (clampedRadius - RADAR.minRadius) / (RADAR.maxRadius - RADAR.minRadius);
+      const distCm = Math.round(10 + norm * 90);
+
+      state.dist = distCm;
+      state.ang = angleDeg;
+
+      updateSimulation();
+    }
+
+    // Eventos de Mouse / Pointer en el Radar
+    canvas.addEventListener("pointerdown", (e) => {
+      state.isDragging = true;
+      canvas.setPointerCapture(e.pointerId);
+      updateFromPointer(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (state.isDragging) {
+        updateFromPointer(e.clientX, e.clientY);
+      }
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      state.isDragging = false;
+      canvas.releasePointerCapture(e.pointerId);
+      updateSimulation();
+    });
+
+    canvas.addEventListener("pointerenter", () => {
+      state.isHovering = true;
+      updateSimulation();
+    });
+
+    canvas.addEventListener("pointerleave", () => {
+      state.isHovering = false;
+      updateSimulation();
+    });
+
+    // Permitir ajuste fino con la rueda del mouse sobre el radar
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (e.shiftKey) {
+        // Shift + Rueda ajusta el ángulo
+        state.ang = Math.max(-90, Math.min(90, state.ang + Math.sign(e.deltaY) * 2));
+      } else {
+        // Rueda normal ajusta la distancia
+        state.dist = Math.max(10, Math.min(100, state.dist - Math.sign(e.deltaY) * 2));
+      }
+      updateSimulation();
+    }, { passive: false });
+
+    // Dibujado del Radar en Canvas
+    function drawRadar(dist, ang, outM1, outM2) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const { cx, cy, maxRadius, minRadius } = RADAR;
+
+      // Gradiente cónico del haz sonar
+      const rad = (ang - 90) * (Math.PI / 180);
+      const beamGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxRadius);
+      beamGrad.addColorStop(0, "rgba(59, 130, 246, 0.28)");
+      beamGrad.addColorStop(1, "rgba(59, 130, 246, 0.0)");
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, maxRadius, rad - 0.45, rad + 0.45);
+      ctx.closePath();
+      ctx.fillStyle = beamGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // Arcos concéntricos del radar
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, (maxRadius / 4) * i, Math.PI, 0, false);
+        ctx.stroke();
+      }
+
+      // Líneas radiales
+      for (let a = -90; a <= 90; a += 30) {
+        const r = (a - 90) * (Math.PI / 180);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(r) * maxRadius, cy + Math.sin(r) * maxRadius);
+        ctx.stroke();
+      }
+
+      // Vector resultante de dirección del robot
+      const steerAngle = ((outM1 - outM2) / 100) * 0.85 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 12);
+      ctx.lineTo(cx + Math.cos(steerAngle) * 58, cy - 12 + Math.sin(steerAngle) * 58);
+      ctx.strokeStyle = "#93c5fd";
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      // Posición del obstáculo detectado
+      const normDist = ((dist - 10) / 90) * (maxRadius - minRadius) + minRadius;
+      const obsX = cx + Math.cos(rad) * normDist;
+      const obsY = cy + Math.sin(rad) * normDist;
+
+      // Línea punteada hacia el obstáculo
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(obsX, obsY);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      // Halo interactivo del obstáculo
+      const haloRadius = state.isDragging ? 16 : (state.isHovering ? 14 : 12);
+      ctx.beginPath();
+      ctx.arc(obsX, obsY, haloRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = state.isDragging ? "#60a5fa" : "rgba(147, 197, 253, 0.55)";
+      ctx.lineWidth = state.isDragging ? 2 : 1.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(obsX, obsY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = state.isDragging ? "#ffffff" : "#93c5fd";
+      ctx.fill();
+
+      // Etiqueta de distancia junto al obstáculo
+      ctx.fillStyle = "#d1d5db";
+      ctx.font = "600 11px sans-serif";
+      const labelOffsetX = obsX > w - 65 ? -44 : 14;
+      ctx.fillText(`${dist}cm`, obsX + labelOffsetX, obsY + 4);
+
+      // Chasis del Robot en la base
+      ctx.fillStyle = "#181a1f";
+      ctx.strokeStyle = "#f3f4f6";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx - 14, cy - 12, 28, 22, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // Ruedas laterales del robot
+      ctx.fillStyle = "#93c5fd";
+      ctx.fillRect(cx - 18, cy - 8, 3, 14);
+      ctx.fillRect(cx + 15, cy - 8, 3, 14);
+
+      // Sensor frontal LED
+      ctx.beginPath();
+      ctx.arc(cx, cy - 12, 3, 0, Math.PI * 2);
+      ctx.fillStyle = dist < 35 ? "#ef4444" : "#f87171";
+      ctx.fill();
+    }
+
+    // Actualización integral de la interfaz
+    function updateSimulation() {
+      const { dist, ang } = state;
+
+      // Actualizar lecturas numéricas inferiores
+      readoutDist.textContent = `${dist} cm`;
+      readoutAng.textContent = ang > 0 ? `+${ang}°` : `${ang}°`;
+
+      // Ejecutar motor difuso
+      const res = computeFuzzyLogic(dist, ang);
+
+      // Actualizar barras de motores
+      barM1.style.width = `${res.outM1}%`;
+      valM1.textContent = `${res.outM1}%`;
+      barM2.style.width = `${res.outM2}%`;
+      valM2.textContent = `${res.outM2}%`;
+
+      // Actualizar barras de pertenencia (Fuzzification)
+      const dominantAng = Math.max(res.muIzq, res.muCtr, res.muDer);
+      barFuzzDist.style.width = `${Math.round(res.muCerca * 100)}%`;
+      valFuzzDist.textContent = res.muCerca.toFixed(2);
+
+      barFuzzAng.style.width = `${Math.round(dominantAng * 100)}%`;
+      valFuzzAng.textContent = dominantAng.toFixed(2);
+
+      // Actualizar tarjetas de reglas activas
+      res.rules.forEach((r) => {
+        const box = document.getElementById(`rule-${r.id}`);
+        const weightEl = document.getElementById(`w-${r.id}`);
+        weightEl.textContent = r.w.toFixed(2);
+        if (r.w > 0.01) {
+          box.classList.add("active");
+        } else {
+          box.classList.remove("active");
+        }
+      });
+
+      // Actualizar badges de estado y acción
+      if (dist < 30) {
+        statusBadge.textContent = "Peligro Crítico";
+        statusBadge.className = "badge danger";
+      } else if (dist < 65) {
+        statusBadge.textContent = "Precaución";
+        statusBadge.className = "badge";
+      } else {
+        statusBadge.textContent = "Despejado";
+        statusBadge.className = "badge safe";
+      }
+
+      if (Math.abs(res.outM1 - res.outM2) <= 4) {
+        actionBadge.textContent = "Avance Recto";
+      } else if (ang > 0) {
+        actionBadge.textContent = "Desvío Derecha";
+      } else {
+        actionBadge.textContent = "Desvío Izquierda";
+      }
+
+      // Redibujar radar
+      drawRadar(dist, ang, res.outM1, res.outM2);
+    }
+
+    // Inicialización con los valores de tu captura (95 cm, +4°)
+    updateSimulation();
+  </script>
+</body>
+</html>
