@@ -1,378 +1,728 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flocking y Campos de Potencial</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #0b0c10;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #c5c6c7;
-        }
-        canvas {
-            display: block;
-        }
-        #ui-panel {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 340px;
-            background: rgba(31, 40, 51, 0.3);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(102, 252, 241, 0.2);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            z-index: 10;
-        }
-        h2 {
-            margin-top: 0;
-            font-size: 1.2rem;
-            border-bottom: 1px solid rgba(102, 252, 241, 0.3);
-            padding-bottom: 10px;
-            color: #66fcf1;
-        }
-        .control-group {
-            margin-bottom: 15px;
-        }
-        .control-group label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            margin-bottom: 5px;
-        }
-        input[type="range"] {
-            width: 100%;
-            cursor: pointer;
-            accent-color: #45a29e;
-        }
-        .desc {
-            font-size: 0.7rem;
-            color: #888;
-            margin-top: -2px;
-            margin-bottom: 8px;
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flocking Multiagente con Potencial Difuso — Ebrahimi & Farrokhi (2024)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0e0e11;
+      color: #f4f4f6;
+    }
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Sliders estilo ámbar como en la referencia */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 5px;
+      border-radius: 9999px;
+      outline: none;
+      background: #4e4e58;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #f59e0b;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.45);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #f59e0b;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(245, 158, 11, 0.45);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
-<body>
+<body class="min-h-screen flex items-center justify-center p-3 sm:p-5 overflow-x-hidden selection:bg-amber-500/30">
 
-    <div id="ui-panel">
-        <h2>Control de Flocking</h2>
-        
-        <div class="control-group">
-            <label><span>Agentes en Bandada</span> <span id="val-agentes">15</span></label>
-            <input type="range" id="slider-agentes" min="1" max="30" value="15">
+  <!-- Contenedor Principal de 2 Columnas (Panel Izquierdo + Arena Derecha) -->
+  <main class="w-full max-w-[1140px] flex flex-col lg:flex-row gap-4 items-stretch">
+
+    <!-- Panel Lateral Izquierdo -->
+    <aside class="w-full lg:w-[300px] shrink-0 rounded-xl border border-[#f59e0b]/45 bg-[#242429] p-5 flex flex-col justify-between shadow-2xl">
+      <div>
+        <!-- Título y separador ámbar -->
+        <div class="flex items-center justify-between pb-3 border-b border-[#f59e0b]/40">
+          <h1 class="text-[15px] font-semibold text-[#f59e0b] tracking-tight">
+            Potencial Difuso Multiagente
+          </h1>
+          <!-- Icono de 6 puntos -->
+          <svg class="w-4 h-4 text-[#f59e0b]/80 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+            <circle cx="5.5" cy="3" r="1.1"/><circle cx="10.5" cy="3" r="1.1"/>
+            <circle cx="5.5" cy="8" r="1.1"/><circle cx="10.5" cy="8" r="1.1"/>
+            <circle cx="5.5" cy="13" r="1.1"/><circle cx="10.5" cy="13" r="1.1"/>
+          </svg>
         </div>
 
-        <div class="control-group">
-            <label><span>Obstáculos (Potencial)</span> <span id="val-obstaculos">3</span></label>
-            <input type="range" id="slider-obstaculos" min="0" max="8" value="3">
+        <!-- Controles Deslizantes -->
+        <div class="mt-4 space-y-5">
+          <!-- Número de agentes: 10 to 40 -->
+          <div>
+            <div class="flex justify-between items-center text-[13px] mb-2">
+              <span class="text-zinc-200 font-medium">Agentes en Enjambre</span>
+              <span id="valAgents" class="font-mono-tech text-zinc-100 font-semibold">40</span>
+            </div>
+            <input type="range" id="sliderAgents" min="10" max="40" step="1" value="40" class="w-full" />
+          </div>
+
+          <!-- Distancia de seguridad: 25 to 45 -->
+          <div>
+            <div class="flex justify-between items-center text-[13px] mb-0.5">
+              <span class="text-zinc-200 font-medium">Distancia de Seguridad</span>
+              <span id="valSafeDist" class="font-mono-tech text-zinc-100 font-semibold">31px</span>
+            </div>
+            <p class="text-[11px] text-zinc-400 mb-2">Radio mínimo preservado (<i>d</i><sub>safe</sub>).</p>
+            <input type="range" id="sliderSafeDist" min="25" max="45" step="1" value="31" class="w-full" />
+          </div>
+
+          <!-- Cohesión y Alineación: 1 to 2.50 -->
+          <div>
+            <div class="flex justify-between items-center text-[13px] mb-2">
+              <span class="text-zinc-200 font-medium">Cohesión y Alineación</span>
+              <span id="valCohesion" class="font-mono-tech text-zinc-100 font-semibold">1.00</span>
+            </div>
+            <input type="range" id="sliderCohesion" min="1" max="2.50" step="0.05" value="1.00" class="w-full" />
+          </div>
+
+          <!-- Velocidad máxima: 1.5 to 3.5 -->
+          <div>
+            <div class="flex justify-between items-center text-[13px] mb-2">
+              <span class="text-zinc-200 font-medium">Velocidad Máxima</span>
+              <span id="valMaxSpeed" class="font-mono-tech text-zinc-100 font-semibold">3.5</span>
+            </div>
+            <input type="range" id="sliderMaxSpeed" min="1.5" max="3.5" step="0.1" value="3.5" class="w-full" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Invasiones / Colisiones + Botón Reiniciar + Instrucción -->
+      <div class="mt-6 space-y-3">
+        <div class="rounded-lg border border-[#7f2d2d]/60 bg-[#1a181a] py-4 px-3 text-center">
+          <div id="valViolations" class="text-3xl font-bold text-[#e0483e] font-mono-tech leading-none">
+            0
+          </div>
+          <div class="mt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-300">
+            Invasiones <i>d</i><sub>safe</sub> Registradas
+          </div>
         </div>
 
-        <div class="control-group">
-            <label><span>Ruido de Sensores (%)</span> <span id="val-ruido">10%</span></label>
-            <span class="desc">Simula perturbación en la lectura de distancias</span>
-            <input type="range" id="slider-ruido" min="0" max="50" value="10">
-        </div>
+        <button
+          id="btnReset"
+          type="button"
+          class="w-full py-2.5 px-4 rounded-lg bg-[#f59e0b] hover:bg-[#fbbf24] active:scale-[0.99] text-zinc-950 font-semibold text-[13px] transition shadow-md cursor-pointer"
+        >
+          Reiniciar Experimento
+        </button>
+      </div>
+    </aside>
 
-        <div class="control-group">
-            <label><span>Fuerza de Cohesión</span> <span id="val-flock">1.0</span></label>
-            <span class="desc">Atracción hacia el centroide del grupo</span>
-            <input type="range" id="slider-flock" min="0" max="3.0" step="0.1" value="1.0">
-        </div>
+    <!-- Lienzo Derecho de Simulación -->
+    <section class="flex-1 min-h-[380px] lg:min-h-[520px] rounded-xl overflow-hidden border border-[#f59e0b]/45 bg-[#151518] shadow-2xl relative">
+      <canvas id="simCanvas"></canvas>
+    </section>
 
-        <div class="control-group">
-            <label><span>Distancia de Seguridad</span> <span id="val-dist">40px</span></label>
-            <span class="desc">Radio de repulsión entre compañeros</span>
-            <input type="range" id="slider-dist" min="15" max="80" value="40">
-        </div>
-        
-        <p style="font-size: 0.75rem; color: #45a29e; margin-top: 15px; text-align: center;">Arrastra los obstáculos con el ratón.</p>
-    </div>
+  </main>
 
-    <canvas id="simCanvas"></canvas>
+  <script>
+    // =========================================================================
+    // 1. ESTADO GLOBAL Y PARÁMETROS DEL ENJAMBRE
+    // =========================================================================
+    const state = {
+      numAgents: 40,
+      dSafe: 31,             // Radio de distancia mínima de seguridad (25-45 px)
+      rSense: 105,           // Radio de percepción / vecindad
+      cohesionGain: 1.00,    // Cohesión y alineación (1-2.50)
+      maxSpeed: 3.5,         // Velocidad máxima (1.5-3.5)
+      maxForce: 0.22,
+      draggedObstacle: null,
+      dragOffset: { x: 0, y: 0 },
+      agents: [],
+      obstacles: [],
+      violationsCount: 0
+    };
 
-    <script>
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    let width = 800;
+    let height = 520;
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+    // =========================================================================
+    // 2. MOTOR DE INFERENCIA DIFUSA (EBRAHIMI & FARROKHI, 2024)
+    // =========================================================================
+    function triMF(x, a, b, c) {
+      if (x <= a || x >= c) return 0;
+      if (x === b) return 1;
+      if (x < b) return (x - a) / (b - a);
+      return (c - x) / (c - b);
+    }
+
+    function trapLeftMF(x, a, b) {
+      if (x <= a) return 1;
+      if (x >= b) return 0;
+      return (b - x) / (b - a);
+    }
+
+    function trapRightMF(x, a, b) {
+      if (x <= a) return 0;
+      if (x >= b) return 1;
+      return (x - a) / (b - a);
+    }
+
+    function evaluateFuzzyPotential(dist, relSpeed, dSafe, dOpt, rMax) {
+      const dCrit = dSafe * 1.05;
+      const dWarn = dSafe * 1.48;
+
+      const muCritical = trapLeftMF(dist, dSafe * 0.92, dWarn);
+      const muCaution  = triMF(dist, dCrit * 0.9, dWarn, dOpt);
+      const muOptimal  = triMF(dist, dWarn * 0.92, dOpt, rMax * 0.95);
+      const muFar      = trapRightMF(dist, dOpt, rMax);
+
+      const approachFactor = Math.max(0, Math.min(1, relSpeed / 3.0));
+
+      const outCritical = -2.65 - 1.15 * approachFactor;
+      const outCaution  = -0.95 - 0.65 * approachFactor;
+      const outOptimal  =  0.00;
+      const outFar      =  0.52 * state.cohesionGain;
+
+      const weightSum = muCritical + muCaution + muOptimal + muFar;
+      let gradient = 0;
+
+      if (weightSum > 1e-6) {
+        gradient = (
+          muCritical * outCritical +
+          muCaution  * outCaution +
+          muOptimal  * outOptimal +
+          muFar      * outFar
+        ) / weightSum;
+      }
+
+      if (dist < dSafe) {
+        const penetration = (dSafe - dist) / Math.max(1, dSafe);
+        gradient -= 3.8 * (penetration * penetration + 0.35);
+      }
+
+      return { gradient };
+    }
+
+    // =========================================================================
+    // 3. INICIALIZACIÓN DE OBSTÁCULOS Y AGENTES
+    // =========================================================================
+    function buildFixedObstacles() {
+      state.obstacles = [
+        { x: width * 0.20, y: height * 0.27, r: 34 },
+        { x: width * 0.50, y: height * 0.30, r: 34 },
+        { x: width * 0.83, y: height * 0.42, r: 34 },
+        { x: width * 0.20, y: height * 0.67, r: 34 },
+        { x: width * 0.45, y: height * 0.83, r: 34 },
+        { x: width * 0.76, y: height * 0.78, r: 34 }
+      ];
+    }
+
+    function createAgent(id) {
+      let x = width * 0.5, y = height * 0.5;
+      for (let attempt = 0; attempt < 150; attempt++) {
+        const cx = 45 + Math.random() * Math.max(80, width - 90);
+        const cy = 45 + Math.random() * Math.max(80, height - 90);
+        let clear = true;
+        for (const obs of state.obstacles) {
+          if (Math.hypot(cx - obs.x, cy - obs.y) < obs.r + state.dSafe + 16) {
+            clear = false;
+            break;
+          }
         }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        if (clear) {
+          x = cx;
+          y = cy;
+          break;
+        }
+      }
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 0.7 + Math.random() * 0.6;
+      return {
+        id,
+        x,
+        y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        wanderAngle: angle,
+        trail: [],
+        inViolation: false
+      };
+    }
 
-        let numAgentes = 15;
-        let numObstaculos = 3;
-        let nivelRuido = 10;
-        let flockStrength = 1.0;
-        let safeDist = 40;
+    function initSimulation() {
+      buildFixedObstacles();
+      state.agents = [];
+      for (let i = 0; i < state.numAgents; i++) {
+        state.agents.push(createAgent(i + 1));
+      }
+      state.violationsCount = 0;
+    }
 
-        document.getElementById('slider-agentes').addEventListener('input', (e) => { numAgentes = parseInt(e.target.value); document.getElementById('val-agentes').innerText = numAgentes; ajustarAgentes(); });
-        document.getElementById('slider-obstaculos').addEventListener('input', (e) => { numObstaculos = parseInt(e.target.value); document.getElementById('val-obstaculos').innerText = numObstaculos; ajustarObstaculos(); });
-        document.getElementById('slider-ruido').addEventListener('input', (e) => { nivelRuido = parseInt(e.target.value); document.getElementById('val-ruido').innerText = nivelRuido + '%'; });
-        document.getElementById('slider-flock').addEventListener('input', (e) => { flockStrength = parseFloat(e.target.value); document.getElementById('val-flock').innerText = flockStrength.toFixed(1); });
-        document.getElementById('slider-dist').addEventListener('input', (e) => { safeDist = parseInt(e.target.value); document.getElementById('val-dist').innerText = safeDist + 'px'; });
+    function syncAgentCount() {
+      while (state.agents.length < state.numAgents) {
+        state.agents.push(createAgent(state.agents.length + 1));
+      }
+      while (state.agents.length > state.numAgents) {
+        state.agents.pop();
+      }
+    }
 
-        class Agente {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 12; 
-                this.vx = (Math.random() - 0.5) * 4;
-                this.vy = (Math.random() - 0.5) * 4;
-                this.maxSpeed = 3.5;
-                // Color azul vibrante
-                this.color = '#00a8ff'; 
+    // =========================================================================
+    // 4. REDIMENSIONADO RESPONSIVO
+    // =========================================================================
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      const rect = container.getBoundingClientRect();
+      const prevW = width;
+      const prevH = height;
+
+      width = Math.max(280, Math.floor(rect.width));
+      height = Math.max(360, Math.floor(rect.height));
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (state.obstacles.length === 0) {
+        initSimulation();
+      } else if (prevW > 0 && prevH > 0) {
+        const sx = width / prevW;
+        const sy = height / prevH;
+        for (const obs of state.obstacles) {
+          obs.x *= sx;
+          obs.y *= sy;
+        }
+        for (const ag of state.agents) {
+          ag.x = Math.min(width - 20, Math.max(20, ag.x * sx));
+          ag.y = Math.min(height - 20, Math.max(20, ag.y * sy));
+        }
+      }
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // =========================================================================
+    // 5. INTERACCIÓN: ARRASTRAR OBSTÁCULOS
+    // =========================================================================
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    function handlePointerDown(e) {
+      const pos = getPointerPos(e);
+      for (let i = state.obstacles.length - 1; i >= 0; i--) {
+        const obs = state.obstacles[i];
+        if (Math.hypot(pos.x - obs.x, pos.y - obs.y) <= obs.r + 8) {
+          state.draggedObstacle = obs;
+          state.dragOffset.x = pos.x - obs.x;
+          state.dragOffset.y = pos.y - obs.y;
+          canvas.style.cursor = 'grabbing';
+          break;
+        }
+      }
+    }
+
+    function handlePointerMove(e) {
+      const pos = getPointerPos(e);
+      if (state.draggedObstacle) {
+        if (e.cancelable) e.preventDefault();
+        const r = state.draggedObstacle.r;
+        state.draggedObstacle.x = Math.max(r + 6, Math.min(width - r - 6, pos.x - state.dragOffset.x));
+        state.draggedObstacle.y = Math.max(r + 6, Math.min(height - r - 6, pos.y - state.dragOffset.y));
+        return;
+      }
+
+      let hoveringObs = false;
+      for (const obs of state.obstacles) {
+        if (Math.hypot(pos.x - obs.x, pos.y - obs.y) <= obs.r + 8) {
+          hoveringObs = true;
+          break;
+        }
+      }
+      canvas.style.cursor = hoveringObs ? 'grab' : 'default';
+    }
+
+    function handlePointerUp() {
+      state.draggedObstacle = null;
+      canvas.style.cursor = 'default';
+    }
+
+    canvas.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+
+    canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    // =========================================================================
+    // 6. DINÁMICA DE FLOCKING CON POTENCIAL DIFUSO
+    // =========================================================================
+    function limitVector(vx, vy, maxVal) {
+      const mag = Math.hypot(vx, vy);
+      if (mag > maxVal && mag > 1e-6) {
+        return { x: (vx / mag) * maxVal, y: (vy / mag) * maxVal };
+      }
+      return { x: vx, y: vy };
+    }
+
+    function stepSimulation() {
+      const N = state.agents.length;
+      if (N === 0) return;
+
+      const dSafe = state.dSafe;
+      const rSense = Math.max(state.rSense, dSafe * 2.5);
+      const dOptAgent = dSafe * 1.95;
+
+      let currentViolations = 0;
+      const forces = new Array(N);
+
+      for (let i = 0; i < N; i++) {
+        const ai = state.agents[i];
+        ai.inViolation = false;
+
+        let fxPot = 0, fyPot = 0;
+        let alignVx = 0, alignVy = 0;
+        let neighborCount = 0;
+
+        for (let j = 0; j < N; j++) {
+          if (i === j) continue;
+          const aj = state.agents[j];
+          const dx = aj.x - ai.x;
+          const dy = aj.y - ai.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < rSense && dist > 1e-4) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const relVx = ai.vx - aj.vx;
+            const relVy = ai.vy - aj.vy;
+            const approachSpeed = relVx * nx + relVy * ny;
+
+            const { gradient } = evaluateFuzzyPotential(dist, approachSpeed, dSafe, dOptAgent, rSense);
+            fxPot += gradient * nx;
+            fyPot += gradient * ny;
+
+            alignVx += aj.vx;
+            alignVy += aj.vy;
+            neighborCount++;
+
+            if (dist < dSafe) {
+              ai.inViolation = true;
+              if (i < j) currentViolations++;
             }
-
-            update(agentes, obstaculos) {
-                let sep = {x: 0, y: 0};
-                let ali = {x: 0, y: 0};
-                let coh = {x: 0, y: 0};
-                let obsRep = {x: 0, y: 0};
-                let vecinosFlock = 0;
-
-                for (let a of agentes) {
-                    if (a === this) continue;
-                    let dx = a.x - this.x;
-                    let dy = a.y - this.y;
-                    let distReal = Math.sqrt(dx*dx + dy*dy);
-                    
-                    let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
-                    let distPercibida = Math.max(0.1, distReal + errorMedicion);
-
-                    if (distPercibida < safeDist) {
-                        sep.x -= (dx / distPercibida);
-                        sep.y -= (dy / distPercibida);
-                    }
-
-                    if (distPercibida < 150) {
-                        ali.x += a.vx;
-                        ali.y += a.vy;
-                        coh.x += a.x;
-                        coh.y += a.y;
-                        vecinosFlock++;
-                    }
-                }
-
-                if (vecinosFlock > 0) {
-                    ali.x /= vecinosFlock;
-                    ali.y /= vecinosFlock;
-                    coh.x = (coh.x / vecinosFlock) - this.x;
-                    coh.y = (coh.y / vecinosFlock) - this.y;
-                }
-
-                for (let o of obstaculos) {
-                    let dx = this.x - o.x;
-                    let dy = this.y - o.y;
-                    let distReal = Math.sqrt(dx*dx + dy*dy);
-                    
-                    let errorMedicion = (Math.random() - 0.5) * (nivelRuido / 100) * 100;
-                    let distPercibida = Math.max(0.1, distReal + errorMedicion);
-                    
-                    let radioEfectivo = o.radius + 120;
-                    if (distPercibida < radioEfectivo) {
-                        let fuerzaRepulsion = 1 - (distPercibida / radioEfectivo);
-                        obsRep.x += (dx / distReal) * (fuerzaRepulsion * 8); 
-                        obsRep.y += (dy / distReal) * (fuerzaRepulsion * 8);
-                    }
-                }
-
-                this.vx += (sep.x * 0.1) + (ali.x * 0.05 * flockStrength) + (coh.x * 0.01 * flockStrength) + (obsRep.x * 0.15);
-                this.vy += (sep.y * 0.1) + (ali.y * 0.05 * flockStrength) + (coh.y * 0.01 * flockStrength) + (obsRep.y * 0.15);
-
-                let speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
-                if (speed > this.maxSpeed) {
-                    this.vx = (this.vx / speed) * this.maxSpeed;
-                    this.vy = (this.vy / speed) * this.maxSpeed;
-                }
-
-                this.x += this.vx;
-                this.y += this.vy;
-
-                let margen = 30;
-                if (this.x < margen) this.vx += 0.5;
-                if (this.x > canvas.width - margen) this.vx -= 0.5;
-                if (this.y < margen) this.vy += 0.5;
-                if (this.y > canvas.height - margen) this.vy -= 0.5;
-            }
-
-            draw() {
-                let angle = Math.atan2(this.vy, this.vx);
-                ctx.translate(this.x, this.y);
-                ctx.rotate(angle);
-                
-                // Configurar sombra suave
-                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-                ctx.shadowBlur = 10;
-                ctx.shadowOffsetX = -2;
-                ctx.shadowOffsetY = 4;
-                
-                // Cuerpo circular
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-                
-                // Borde blanco grueso
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
-                // Quitar la sombra para los detalles internos
-                ctx.shadowColor = "transparent";
-
-                // Línea direccional interna
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(this.radius, 0);
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // Esfera indicadora en la punta
-                ctx.beginPath();
-                ctx.arc(this.radius + 2, 0, 3, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-                
-                // Anillo tenue de distancia de seguridad
-                if(safeDist > this.radius + 5) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, safeDist, 0, Math.PI * 2);
-                    ctx.strokeStyle = "rgba(102, 252, 241, 0.05)";
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-            }
+          }
         }
 
-        class Obstaculo {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 35;
-                this.isDragging = false;
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.isDragging ? "rgba(255, 65, 85, 0.8)" : "rgba(197, 198, 199, 0.2)";
-                ctx.fill();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-                ctx.stroke();
-
-                for (let i = 1; i <= 3; i++) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius + (i * 40), 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(255, 65, 85, ${0.3 / i})`;
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-            }
+        let fxAlign = 0, fyAlign = 0;
+        if (neighborCount > 0) {
+          alignVx /= neighborCount;
+          alignVy /= neighborCount;
+          fxAlign = (alignVx - ai.vx) * 0.42 * state.cohesionGain;
+          fyAlign = (alignVy - ai.vy) * 0.42 * state.cohesionGain;
         }
 
-        let agentes = [];
-        let obstaculos = [];
-        let draggingObstacle = null;
+        let fxObs = 0, fyObs = 0;
+        for (const obs of state.obstacles) {
+          const dx = obs.x - ai.x;
+          const dy = obs.y - ai.y;
+          const centerDist = Math.hypot(dx, dy);
+          const surfaceDist = Math.max(0.1, centerDist - obs.r);
+          const obsInfluenceRange = dSafe * 2.6;
 
-        function init() {
-            for (let i = 0; i < numAgentes; i++) {
-                agentes.push(new Agente(canvas.width / 2 + (Math.random() - 0.5) * 300, canvas.height / 2 + (Math.random() - 0.5) * 300));
+          if (surfaceDist < obsInfluenceRange && centerDist > 1e-4) {
+            const nx = dx / centerDist;
+            const ny = dy / centerDist;
+            const approachSpeed = ai.vx * nx + ai.vy * ny;
+
+            const { gradient } = evaluateFuzzyPotential(
+              surfaceDist,
+              approachSpeed,
+              dSafe,
+              obsInfluenceRange,
+              obsInfluenceRange * 1.2
+            );
+            const repGrad = Math.min(0, gradient) * 1.55;
+            fxObs += repGrad * nx;
+            fyObs += repGrad * ny;
+
+            if (surfaceDist < dSafe) {
+              ai.inViolation = true;
+              currentViolations++;
             }
-            for (let i = 0; i < numObstaculos; i++) {
-                obstaculos.push(new Obstaculo(canvas.width / 2 + (Math.random() - 0.5) * 600, canvas.height / 2 + (Math.random() - 0.5) * 400));
-            }
+          }
         }
 
-        function ajustarAgentes() {
-            while (agentes.length < numAgentes) agentes.push(new Agente(canvas.width / 2, canvas.height / 2));
-            while (agentes.length > numAgentes) agentes.pop();
+        ai.wanderAngle += (Math.random() - 0.5) * 0.28;
+        const fxWander = Math.cos(ai.wanderAngle) * 0.14;
+        const fyWander = Math.sin(ai.wanderAngle) * 0.14;
+
+        const wallMargin = Math.max(36, dSafe * 1.25);
+        let fxWall = 0, fyWall = 0;
+        if (ai.x < wallMargin) fxWall += ((wallMargin - ai.x) / wallMargin) * 0.85;
+        if (ai.x > width - wallMargin) fxWall -= ((ai.x - (width - wallMargin)) / wallMargin) * 0.85;
+        if (ai.y < wallMargin) fyWall += ((wallMargin - ai.y) / wallMargin) * 0.85;
+        if (ai.y > height - wallMargin) fyWall -= ((ai.y - (height - wallMargin)) / wallMargin) * 0.85;
+
+        const rawFx = fxPot + fxAlign + fxObs + fxWander + fxWall;
+        const rawFy = fyPot + fyAlign + fyObs + fyWander + fyWall;
+        forces[i] = limitVector(rawFx, rawFy, state.maxForce * 2.5);
+      }
+
+      for (let i = 0; i < N; i++) {
+        const ag = state.agents[i];
+        ag.vx += forces[i].x;
+        ag.vy += forces[i].y;
+
+        const limitedV = limitVector(ag.vx, ag.vy, state.maxSpeed);
+        ag.vx = limitedV.x;
+        ag.vy = limitedV.y;
+
+        const spd = Math.hypot(ag.vx, ag.vy);
+        if (spd < state.maxSpeed * 0.35 && spd > 1e-4) {
+          ag.vx = (ag.vx / spd) * (state.maxSpeed * 0.35);
+          ag.vy = (ag.vy / spd) * (state.maxSpeed * 0.35);
         }
 
-        function ajustarObstaculos() {
-            while (obstaculos.length < numObstaculos) obstaculos.push(new Obstaculo(canvas.width / 2, canvas.height / 2));
-            while (obstaculos.length > numObstaculos) obstaculos.pop();
+        ag.x += ag.vx;
+        ag.y += ag.vy;
+
+        if (ag.x < 12) { ag.x = 12; ag.vx = Math.abs(ag.vx); ag.wanderAngle = Math.atan2(ag.vy, ag.vx); }
+        if (ag.x > width - 12) { ag.x = width - 12; ag.vx = -Math.abs(ag.vx); ag.wanderAngle = Math.atan2(ag.vy, ag.vx); }
+        if (ag.y < 12) { ag.y = 12; ag.vy = Math.abs(ag.vy); ag.wanderAngle = Math.atan2(ag.vy, ag.vx); }
+        if (ag.y > height - 12) { ag.y = height - 12; ag.vy = -Math.abs(ag.vy); ag.wanderAngle = Math.atan2(ag.vy, ag.vx); }
+
+        ag.trail.push({ x: ag.x, y: ag.y });
+        if (ag.trail.length > 16) ag.trail.shift();
+      }
+
+      state.violationsCount = currentViolations;
+    }
+
+    // =========================================================================
+    // 7. RENDERIZADO EN CANVAS
+    // =========================================================================
+    function renderCanvas() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Cuadrícula sutil oscura
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.lineWidth = 1;
+      const gridSize = 42;
+      for (let x = 0; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Red de vecindad entre agentes
+      const rSense = Math.max(state.rSense, state.dSafe * 2.5);
+      for (let i = 0; i < state.agents.length; i++) {
+        for (let j = i + 1; j < state.agents.length; j++) {
+          const a = state.agents[i];
+          const b = state.agents[j];
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (dist < rSense) {
+            const alpha = (1 - dist / rSense) * 0.22;
+            ctx.strokeStyle = dist < state.dSafe
+              ? `rgba(224, 72, 62, ${alpha + 0.25})`
+              : `rgba(56, 189, 248, ${alpha})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Obstáculos circulares gris-azulado arrastrables
+      for (const obs of state.obstacles) {
+        const isDragged = state.draggedObstacle === obs;
+
+        // Halo punteado d_safe
+        ctx.save();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = isDragged ? 'rgba(245, 158, 11, 0.45)' : 'rgba(148, 163, 184, 0.16)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(obs.x, obs.y, obs.r + state.dSafe, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Cuerpo sólido del obstáculo
+        ctx.fillStyle = '#3c4556';
+        ctx.beginPath();
+        ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Borde del obstáculo
+        ctx.strokeStyle = isDragged ? '#f59e0b' : '#8e9bb0';
+        ctx.lineWidth = isDragged ? 2 : 1.5;
+        ctx.stroke();
+      }
+
+      // Agentes con estela, cono sensorial frontal y cuerpo circular
+      for (const ag of state.agents) {
+        if (ag.trail.length > 1) {
+          for (let k = 1; k < ag.trail.length; k++) {
+            const tAlpha = (k / ag.trail.length) * 0.16;
+            ctx.strokeStyle = ag.inViolation
+              ? `rgba(224, 72, 62, ${tAlpha})`
+              : `rgba(14, 165, 233, ${tAlpha})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(ag.trail[k - 1].x, ag.trail[k - 1].y);
+            ctx.lineTo(ag.trail[k].x, ag.trail[k].y);
+            ctx.stroke();
+          }
         }
 
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+        const angle = Math.atan2(ag.vy, ag.vx);
 
-            for (let obs of obstaculos) {
-                let dx = mouseX - obs.x;
-                let dy = mouseY - obs.y;
-                if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
-                    draggingObstacle = obs;
-                    obs.isDragging = true;
-                    canvas.style.cursor = 'grabbing';
-                    break;
-                }
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            
-            if (draggingObstacle) {
-                draggingObstacle.x = mouseX;
-                draggingObstacle.y = mouseY;
-            } else {
-                let overObs = false;
-                for (let obs of obstaculos) {
-                    let dx = mouseX - obs.x;
-                    let dy = mouseY - obs.y;
-                    if (Math.sqrt(dx*dx + dy*dy) <= obs.radius) {
-                        overObs = true;
-                        break;
-                    }
-                }
-                canvas.style.cursor = overObs ? 'grab' : 'default';
-            }
-        });
-
-        window.addEventListener('mouseup', () => {
-            if (draggingObstacle) {
-                draggingObstacle.isDragging = false;
-                draggingObstacle = null;
-                canvas.style.cursor = 'default';
-            }
-        });
-
-        function animate() {
-            ctx.fillStyle = "rgba(11, 12, 16, 0.4)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            for (let obs of obstaculos) {
-                obs.draw();
-            }
-            
-            for (let agente of agentes) {
-                agente.update(agentes, obstaculos);
-                agente.draw();
-            }
-
-            requestAnimationFrame(animate);
+        // Cono sutil de percepción hacia el frente
+        ctx.save();
+        ctx.translate(ag.x, ag.y);
+        ctx.rotate(angle);
+        const coneGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, state.dSafe * 1.35);
+        if (ag.inViolation) {
+          coneGrad.addColorStop(0, 'rgba(224, 72, 62, 0.18)');
+          coneGrad.addColorStop(1, 'rgba(224, 72, 62, 0)');
+        } else {
+          coneGrad.addColorStop(0, 'rgba(34, 197, 94, 0.14)');
+          coneGrad.addColorStop(1, 'rgba(34, 197, 94, 0)');
         }
+        ctx.fillStyle = coneGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, state.dSafe * 1.35, -0.45, 0.45);
+        ctx.closePath();
+        ctx.fill();
 
-        init();
-        animate();
-    </script>
+        // Cuerpo circular azul con borde blanco
+        ctx.fillStyle = ag.inViolation ? '#e0483e' : '#0ea5e9';
+        ctx.beginPath();
+        ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Indicador blanco de orientación frontal
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(8.5, 0);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+
+    // =========================================================================
+    // 8. ACTUALIZACIÓN DE UI Y CONTROLES DESLIZANTES
+    // =========================================================================
+    function updateSliderFill(slider) {
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const val = parseFloat(slider.value);
+      const pct = ((val - min) / (max - min)) * 100;
+      slider.style.background = `linear-gradient(to right, #f59e0b 0%, #f59e0b ${pct}%, #4e4e58 ${pct}%, #4e4e58 100%)`;
+    }
+
+    const sliderAgents = document.getElementById('sliderAgents');
+    const sliderSafeDist = document.getElementById('sliderSafeDist');
+    const sliderCohesion = document.getElementById('sliderCohesion');
+    const sliderMaxSpeed = document.getElementById('sliderMaxSpeed');
+    const btnReset = document.getElementById('btnReset');
+
+    btnReset.addEventListener('click', () => {
+      initSimulation();
+      updateMetricsUI();
+    });
+
+    sliderAgents.addEventListener('input', (e) => {
+      state.numAgents = parseInt(e.target.value, 10);
+      document.getElementById('valAgents').textContent = state.numAgents;
+      updateSliderFill(sliderAgents);
+      syncAgentCount();
+    });
+
+    sliderSafeDist.addEventListener('input', (e) => {
+      state.dSafe = parseInt(e.target.value, 10);
+      document.getElementById('valSafeDist').textContent = `${state.dSafe}px`;
+      updateSliderFill(sliderSafeDist);
+    });
+
+    sliderCohesion.addEventListener('input', (e) => {
+      state.cohesionGain = parseFloat(e.target.value);
+      document.getElementById('valCohesion').textContent = state.cohesionGain.toFixed(2);
+      updateSliderFill(sliderCohesion);
+    });
+
+    sliderMaxSpeed.addEventListener('input', (e) => {
+      state.maxSpeed = parseFloat(e.target.value);
+      document.getElementById('valMaxSpeed').textContent = state.maxSpeed.toFixed(1);
+      updateSliderFill(sliderMaxSpeed);
+    });
+
+    function updateMetricsUI() {
+      document.getElementById('valViolations').textContent = state.violationsCount;
+    }
+
+    // =========================================================================
+    // 9. BUCLE PRINCIPAL DE ANIMACIÓN
+    // =========================================================================
+    function animate() {
+      stepSimulation();
+      renderCanvas();
+      updateMetricsUI();
+      requestAnimationFrame(animate);
+    }
+
+    window.onload = function () {
+      [sliderAgents, sliderSafeDist, sliderCohesion, sliderMaxSpeed].forEach(updateSliderFill);
+      resizeCanvas();
+      animate();
+    };
+  </script>
 </body>
 </html>
