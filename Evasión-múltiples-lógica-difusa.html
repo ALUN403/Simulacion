@@ -6,14 +6,16 @@
 <title>Enjambres con Inferencia Difusa Híbrida</title>
 <style>
   :root {
-    --bg-app: #121316;
-    --bg-card: #1b1c20;
+    --bg-app: #141416;
+    --bg-card: #222126;
     --bg-canvas: #141518;
-    --bg-pill: #25272c;
-    --border-subtle: #2b2d33;
+    --bg-pill: #2c2b31;
+    --border-amber: rgba(243, 156, 18, 0.35);
+    --border-subtle: #333238;
     --text-primary: #f1f3f5;
     --text-secondary: #9aa0a6;
-    --accent-blue: #4f7df3;
+    --accent-amber: #f39c12;
+    --accent-amber-hover: #e67e22;
     --swarm-blue: #8ab4f8;
     --swarm-magenta: #f48fb1;
     --swarm-green: #81c995;
@@ -31,45 +33,190 @@
     color: var(--text-primary);
     display: flex;
     justify-content: center;
-    padding: 16px;
+    align-items: flex-start;
+    padding: 18px;
     min-height: 100vh;
   }
 
   .app-shell {
     width: 100%;
-    max-width: 760px;
+    max-width: 1240px;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* Panel Izquierdo: Parámetros */
+  .controls-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-amber);
+    border-radius: 14px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
 
-  .card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 18px;
-    padding: 18px 22px;
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-amber);
   }
 
-  /* Header Card */
   .header-title {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.08rem;
+    font-weight: 500;
+    color: var(--accent-amber);
+    line-height: 1.3;
     letter-spacing: -0.01em;
   }
 
-  /* Canvas Card */
-  .canvas-card {
-    padding: 14px;
+  .grip-icon {
+    display: grid;
+    grid-template-columns: repeat(2, 3px);
+    gap: 3px;
+    opacity: 0.7;
+    margin-top: 4px;
+    flex-shrink: 0;
   }
 
-  .canvas-container {
-    position: relative;
+  .grip-icon span {
+    width: 3px;
+    height: 3px;
+    background-color: var(--accent-amber);
+    border-radius: 50%;
+  }
+
+  .sliders-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    margin-bottom: 26px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .slider-label {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .slider-sublabel {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    margin-bottom: 10px;
+  }
+
+  .value-display {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Sliders personalizados color ámbar */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
-    height: 360px;
-    background-color: var(--bg-canvas);
-    border-radius: 12px;
-    overflow: hidden;
+    height: 5px;
+    background: #3a3940;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    background: var(--accent-amber);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.25);
+    transition: transform 0.12s ease;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    background: var(--accent-amber);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-action {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 11px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
     border: 1px solid var(--border-subtle);
+    background-color: var(--bg-pill);
+    color: var(--text-primary);
+    transition: background-color 0.15s ease;
+  }
+
+  .btn-action:hover {
+    background-color: #36353d;
+  }
+
+  .btn-action.primary {
+    background-color: var(--accent-amber);
+    border-color: var(--accent-amber);
+    color: #121214;
+  }
+
+  .btn-action.primary:hover {
+    background-color: var(--accent-amber-hover);
+  }
+
+  .panel-footer-hint {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  /* Panel Derecho: Lienzo de Simulación */
+  .canvas-card {
+    background-color: var(--bg-canvas);
+    border: 1px solid var(--border-amber);
+    border-radius: 14px;
+    overflow: hidden;
+    height: 540px;
+    position: relative;
     cursor: crosshair;
   }
 
@@ -79,135 +226,64 @@
     height: 100%;
   }
 
-  /* Controls Card */
-  .sliders-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 18px;
-  }
-
-  .slider-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: 0.82rem;
-  }
-
-  .value-badge {
-    background-color: var(--bg-pill);
-    padding: 4px 12px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    background: #3c4043;
-    border-radius: 2px;
-    outline: none;
-  }
-
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 4px;
-    height: 16px;
-    background: #ffffff;
-    border-radius: 2px;
-    cursor: pointer;
-  }
-
-  .footer-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 14px;
-    border-top: 1px solid var(--border-subtle);
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .footer-info {
-    font-size: 0.76rem;
-    color: var(--text-secondary);
-  }
-
-  .action-buttons {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    border-radius: 999px;
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid var(--border-subtle);
-    background-color: var(--bg-pill);
-    color: var(--text-primary);
-  }
-
-  .btn-action.primary {
-    background-color: #283559;
-    border-color: var(--accent-blue);
-    color: #d2e3fc;
-  }
-
-  @media (max-width: 600px) {
-    .sliders-grid { grid-template-columns: 1fr; }
+  @media (max-width: 840px) {
+    .app-shell {
+      grid-template-columns: 1fr;
+    }
+    .canvas-card {
+      height: 400px;
+    }
   }
 </style>
 </head>
 <body>
 
 <div class="app-shell">
-  <!-- Panel Superior: Título -->
-  <div class="card">
-    <div class="header-title">Enjambres con Inferencia Difusa Híbrida</div>
-  </div>
-
-  <!-- Panel Central: Lienzo de Simulación -->
-  <div class="card canvas-card">
-    <div class="canvas-container" id="canvasBox">
-      <canvas id="simCanvas"></canvas>
+  <!-- Panel Izquierdo: Parámetros -->
+  <aside class="controls-card">
+    <div class="panel-header">
+      <div class="header-title">Enjambres con Inferencia Difusa Híbrida</div>
+      <div class="grip-icon" aria-hidden="true">
+        <span></span><span></span>
+        <span></span><span></span>
+        <span></span><span></span>
+      </div>
     </div>
-  </div>
 
-  <!-- Panel Inferior: Parámetros y Controles -->
-  <div class="card">
-    <div class="sliders-grid">
+    <div class="sliders-stack">
       <div>
         <div class="slider-header">
-          <span>Robots por enjambre (N)</span>
-          <span class="value-badge" id="nBadge">2</span>
+          <span class="slider-label">Robots por Enjambre (N)</span>
+          <span class="value-display" id="nBadge">2</span>
         </div>
         <input type="range" id="nSlider" min="1" max="5" step="1" value="2">
       </div>
+
       <div>
         <div class="slider-header">
-          <span>Rango sensor difuso (r<sub>sens</sub>)</span>
-          <span class="value-badge" id="rBadge">1.5 m</span>
+          <span class="slider-label">Rango Sensor Difuso (r<sub>sens</sub>)</span>
+          <span class="value-display" id="rBadge">1.5 m</span>
         </div>
+        <span class="slider-sublabel">Distancia umbral para activar la evasión difusa.</span>
         <input type="range" id="rSlider" min="1.5" max="2.5" step="0.1" value="1.5">
       </div>
     </div>
 
-    <div class="footer-controls">
-      <div class="footer-info">Radio físico R = 0.25 m · Halo líder = r<sub>sens</sub></div>
-      <div class="action-buttons">
-        <button class="btn-action primary" id="pauseBtn">❚❚ Pausar</button>
-        <button class="btn-action" id="resetBtn">↻ Reiniciar</button>
-      </div>
+    <div class="action-buttons">
+      <button class="btn-action primary" id="resetBtn">Reiniciar Simulación</button>
+      <button class="btn-action" id="pauseBtn">❚❚ Pausar</button>
     </div>
-  </div>
+
+    <div class="panel-footer-hint">
+      Radio físico R = 0.25 m · Halo líder = r<sub>sens</sub><br>
+      Haz clic o arrastra en el lienzo para mover la meta azul.
+    </div>
+  </aside>
+
+  <!-- Panel Derecho: Lienzo de Simulación -->
+  <main class="canvas-card" id="canvasBox">
+    <canvas id="simCanvas"></canvas>
+  </main>
 </div>
 
 <script>
@@ -368,7 +444,7 @@ function calcularFuerzasAgente(agent, ownSwarm, allSwarms, params) {
 }
 
 // ============================================================================
-// 4. ESTADO DE SIMULACIÓN, RENDERIZADO Y CONTROLES (Triple Enjambre por defecto)
+// 4. ESTADO DE SIMULACIÓN, RENDERIZADO Y CONTROLES
 // ============================================================================
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
@@ -386,9 +462,17 @@ let simTime = 0;
 let paused = false;
 let isDraggingGoal = false;
 
-const PIXELS_PER_METER = 34;
+const PIXELS_PER_METER = 38;
 const R_ROBOT = 0.25;
 const V_MAX = 1.85;
+
+function updateSliderFill(slider) {
+  const min = parseFloat(slider.min);
+  const max = parseFloat(slider.max);
+  const val = parseFloat(slider.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  slider.style.background = `linear-gradient(to right, #f39c12 0%, #f39c12 ${pct}%, #3a3940 ${pct}%, #3a3940 100%)`;
+}
 
 function worldToScreen(wx, wy) {
   return {
@@ -429,9 +513,9 @@ function initSimulation() {
   const n = parseInt(nSlider.value, 10);
 
   swarms = [
-    createSwarm(1, '#8ab4f8', -7.2, -3.2, 7.2, 3.2, n),
-    createSwarm(2, '#f48fb1', 7.2, -3.2, -7.2, 3.2, n),
-    createSwarm(3, '#81c995', 0, 4.2, 0, -4.2, n)
+    createSwarm(1, '#8ab4f8', -7.2, -3.6, 7.2, 3.6, n),
+    createSwarm(2, '#f48fb1', 7.2, -3.6, -7.2, 3.6, n),
+    createSwarm(3, '#81c995', 0, 4.8, 0, -4.8, n)
   ];
 }
 
@@ -480,7 +564,7 @@ function drawScene() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // 1. Cuadrícula de fondo (1 metro por celda)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
   ctx.lineWidth = 1;
   const step = PIXELS_PER_METER;
   for (let x = (canvas.width / 2) % step; x < canvas.width; x += step) {
@@ -550,7 +634,7 @@ function drawScene() {
     ctx.moveTo(gPos.x, gPos.y - 5); ctx.lineTo(gPos.x, gPos.y + 5);
     ctx.stroke();
 
-    const rPx = Math.max(6.5, R_ROBOT * PIXELS_PER_METER);
+    const rPx = Math.max(7, R_ROBOT * PIXELS_PER_METER);
     for (const ag of swarm.agents) {
       const pos = worldToScreen(ag.x, ag.y);
       ctx.fillStyle = swarm.color;
@@ -578,11 +662,13 @@ function animate() {
 // ============================================================================
 nSlider.addEventListener('input', () => {
   nBadge.textContent = nSlider.value;
+  updateSliderFill(nSlider);
   initSimulation();
 });
 
 rSlider.addEventListener('input', () => {
   rBadge.textContent = `${parseFloat(rSlider.value).toFixed(1)} m`;
+  updateSliderFill(rSlider);
 });
 
 pauseBtn.addEventListener('click', () => {
@@ -621,6 +707,8 @@ window.addEventListener('resize', () => {
   canvas.height = canvasBox.clientHeight;
 });
 
+updateSliderFill(nSlider);
+updateSliderFill(rSlider);
 initSimulation();
 animate();
 </script>
