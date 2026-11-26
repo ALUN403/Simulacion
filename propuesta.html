@@ -54,12 +54,6 @@
       letter-spacing: -0.02em;
     }
 
-    header p {
-      font-size: 0.84rem;
-      color: var(--text-secondary);
-      margin-top: 2px;
-    }
-
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -125,21 +119,6 @@
       display: block;
       cursor: crosshair;
       touch-action: none;
-    }
-
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-top: 10px;
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
     .dot {
@@ -265,7 +244,6 @@
     <header>
       <div>
         <h1>Enjambre con Lógica Difusa: Exploración Aleatoria y Ruta</h1>
-        <p>Los robots inician explorando aleatoriamente sin colisiones. Pulsa <strong>Agregar Ruta</strong> para asignarles un recorrido editable.</p>
       </div>
       <div class="toolbar">
         <button id="btn-add-robot">+ Robot (<span id="robot-count">2</span>/5)</button>
@@ -280,7 +258,6 @@
       <div class="arena-wrapper">
         <canvas id="swarmCanvas" width="1000" height="450"></canvas>
       </div>
-      <div id="legend" class="legend"></div>
     </div>
 
     <div id="robots-grid" class="robots-grid"></div>
@@ -356,33 +333,7 @@
 
     function rebuildRobotUI() {
       const grid = document.getElementById("robots-grid");
-      const legend = document.getElementById("legend");
       syncToolbarButtons();
-
-      legend.innerHTML = "";
-      robots.forEach((r) => {
-        const item = document.createElement("div");
-        item.className = "legend-item";
-        item.innerHTML = `<span class="dot" style="background:${r.color};"></span> ${r.name}`;
-        legend.appendChild(item);
-      });
-
-      if (waypoints.length > 0) {
-        const wpLegend = document.createElement("div");
-        wpLegend.className = "legend-item";
-        wpLegend.innerHTML = `<span class="dot" style="background:#34d399;"></span> Puntos de Ruta (arrastrables)`;
-        legend.appendChild(wpLegend);
-      }
-
-      const obsLegend = document.createElement("div");
-      obsLegend.className = "legend-item";
-      obsLegend.innerHTML = `<span class="dot" style="background:#f87171;"></span> Obstáculos (clic o arrastrar)`;
-      legend.appendChild(obsLegend);
-
-      const wallLegend = document.createElement("div");
-      wallLegend.className = "legend-item";
-      wallLegend.innerHTML = `<span>Perímetro: Pared con evasión difusa</span>`;
-      legend.appendChild(wallLegend);
 
       grid.innerHTML = "";
       robots.forEach((r) => {
@@ -412,7 +363,6 @@
     }
 
     function initSimulation() {
-      // Inicia SIN ruta (navegación aleatoria) y SIN obstáculos
       waypoints = [];
       obstacles = [];
       robots = [];
@@ -434,7 +384,6 @@
       if (waypoints.length > 0) return;
       waypoints = createRoute();
 
-      // Asignar el waypoint más cercano al primer robot para transición fluida
       let nearestIdx = 0;
       let minDist = Infinity;
       if (robots[0]) {
