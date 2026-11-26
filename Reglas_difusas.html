@@ -16,8 +16,11 @@
       --accent-indigo: #a5b4fc;
       --accent-green: #34d399;
       --accent-lime: #bef264;
+      --accent-red: #f87171;
       --rule-active-bg: #13254b;
       --rule-active-border: #3b82f6;
+      --rule-danger-bg: #450a0a;
+      --rule-danger-border: #ef4444;
       --rule-inactive-bg: #1a1c20;
       --rule-inactive-border: #2a2d34;
     }
@@ -164,7 +167,7 @@
 
     .metric-row {
       display: grid;
-      grid-template-columns: 125px 1fr 48px;
+      grid-template-columns: 125px 1fr 52px;
       align-items: center;
       gap: 10px;
       font-size: 0.85rem;
@@ -192,7 +195,7 @@
     .progress-fill {
       height: 100%;
       border-radius: 999px;
-      transition: width 0.06s ease-out;
+      transition: width 0.06s ease-out, background-color 0.15s ease;
     }
 
     .divider {
@@ -211,11 +214,11 @@
     /* Matriz de Inferencia Difusa */
     .rules-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 10px;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 680px) {
       .rules-grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -235,8 +238,14 @@
       box-shadow: 0 0 12px rgba(59, 130, 246, 0.18);
     }
 
+    .rule-box.danger-active {
+      background-color: var(--rule-danger-bg);
+      border-color: var(--rule-danger-border);
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.28);
+    }
+
     .rule-name {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
       color: var(--text-secondary);
       margin-bottom: 4px;
@@ -244,6 +253,10 @@
 
     .rule-box.active .rule-name {
       color: #bfdbfe;
+    }
+
+    .rule-box.danger-active .rule-name {
+      color: #fecaca;
     }
 
     .rule-weight {
@@ -255,6 +268,10 @@
 
     .rule-box.active .rule-weight {
       color: #93c5fd;
+    }
+
+    .rule-box.danger-active .rule-weight {
+      color: #f87171;
     }
 
     /* Panel de Telemetría de Entrada (Sin Sliders) */
@@ -323,7 +340,7 @@
         </div>
         <div class="radar-box">
           <canvas id="radarCanvas" width="360" height="225"></canvas>
-          <span class="radar-hint">Arrastra el punto en el radar</span>
+          <span class="radar-hint">Arrastra el punto en el radar (acerca a &lt;20cm para 180°/reversa)</span>
         </div>
       </div>
 
@@ -340,7 +357,7 @@
             <div class="progress-track">
               <div id="bar-m1" class="progress-fill" style="width: 80%; background: var(--accent-blue);"></div>
             </div>
-            <span id="val-m1" class="metric-value">80%</span>
+            <span id="val-m1" class="metric-value">+80%</span>
           </div>
 
           <div class="metric-row">
@@ -348,7 +365,7 @@
             <div class="progress-track">
               <div id="bar-m2" class="progress-fill" style="width: 80%; background: var(--accent-indigo);"></div>
             </div>
-            <span id="val-m2" class="metric-value">80%</span>
+            <span id="val-m2" class="metric-value">+80%</span>
           </div>
         </div>
 
@@ -357,7 +374,7 @@
         <div class="section-label">Pertenencia de Entrada (Fuzzification)</div>
         <div class="metric-group">
           <div class="metric-row">
-            <span class="metric-label">Dist: Cerca / Far</span>
+            <span class="metric-label">Dist: MuyCerca/Cerca</span>
             <div class="progress-track">
               <div id="bar-fuzz-dist" class="progress-fill" style="width: 0%; background: var(--accent-green);"></div>
             </div>
@@ -410,6 +427,10 @@
         <div id="rule-r7" class="rule-box">
           <div class="rule-name">R7: Si Media & Derecha</div>
           <div id="w-r7" class="rule-weight">0.00</div>
+        </div>
+        <div id="rule-r8" class="rule-box">
+          <div class="rule-name">R8: Si Muy Cerca (180°/Rev)</div>
+          <div id="w-r8" class="rule-weight">0.00</div>
         </div>
       </div>
     </div>
@@ -468,9 +489,9 @@
     // Parámetros geométricos del radar
     const RADAR = {
       cx: canvas.width / 2,
-      cy: canvas.height - 38,
-      maxRadius: 155,
-      minRadius: 25
+      cy: canvas.height - 46,
+      maxRadius: 150,
+      minRadius: 22
     };
 
     // Funciones de pertenencia (Triangulares / Trapezoidales)
@@ -491,24 +512,33 @@
     // Motor de inferencia difusa
     function computeFuzzyLogic(dist, ang) {
       // 1. Fuzzificación de Distancia (10 cm a 100 cm)
-      const muCerca = trapmf(dist, 0, 10, 22, 55);
-      const muMedia = trimf(dist, 22, 45, 70);
-      const muLejos = trapmf(dist, 40, 65, 100, 120);
+      const muMuyCerca = trapmf(dist, 0, 10, 15, 23);  // Zona crítica de colisión (< 23 cm)
+      const muCerca    = trimf(dist, 15, 28, 55);      // Evasión cercana
+      const muMedia    = trimf(dist, 25, 48, 70);      // Precaución media
+      const muLejos    = trapmf(dist, 42, 65, 100, 120); // Camino despejado
 
       // 2. Fuzzificación de Ángulo (-90° Izquierda a +90° Derecha)
       const muIzq = trapmf(ang, -110, -90, -35, -5);
       const muCtr = trimf(ang, -30, 0, 30);
       const muDer = trapmf(ang, 5, 35, 90, 110);
 
+      // Dirección de escape 180° / Reversa según de qué lado viene el impacto
+      // Si el obstáculo está muy encima frontalmente (< 13 cm), retrocede en reversa pura (-60%, -60%)
+      // Entre 13 y 23 cm ejecuta contrarrotación de 180° (+75% / -75%) hacia el lado libre
+      const isReversePure = dist <= 13;
+      const escapeM1 = isReversePure ? -60 : (ang > 0 ? -75 : 75);
+      const escapeM2 = isReversePure ? -60 : (ang > 0 ? 75 : -75);
+
       // 3. Evaluación de Reglas (Operador AND = Math.min)
       const rules = [
-        { id: "r1", w: muLejos,                 m1: 80, m2: 80 },
-        { id: "r2", w: Math.min(muCerca, muCtr), m1: 85, m2: 15 },
-        { id: "r3", w: Math.min(muCerca, muIzq), m1: 85, m2: 20 },
-        { id: "r4", w: Math.min(muCerca, muDer), m1: 20, m2: 85 },
-        { id: "r5", w: Math.min(muMedia, muCtr), m1: 75, m2: 40 },
-        { id: "r6", w: Math.min(muMedia, muIzq), m1: 78, m2: 48 },
-        { id: "r7", w: Math.min(muMedia, muDer), m1: 48, m2: 78 }
+        { id: "r1", w: muLejos,                 m1: 80,       m2: 80 },
+        { id: "r2", w: Math.min(muCerca, muCtr), m1: 85,       m2: 15 },
+        { id: "r3", w: Math.min(muCerca, muIzq), m1: 85,       m2: 20 },
+        { id: "r4", w: Math.min(muCerca, muDer), m1: 20,       m2: 85 },
+        { id: "r5", w: Math.min(muMedia, muCtr), m1: 75,       m2: 40 },
+        { id: "r6", w: Math.min(muMedia, muIzq), m1: 78,       m2: 48 },
+        { id: "r7", w: Math.min(muMedia, muDer), m1: 48,       m2: 78 },
+        { id: "r8", w: muMuyCerca,              m1: escapeM1, m2: escapeM2 }
       ];
 
       // 4. Defuzzificación (Promedio Ponderado)
@@ -526,6 +556,7 @@
       const outM2 = sumW > 0 ? Math.round(sumM2 / sumW) : 80;
 
       return {
+        muMuyCerca,
         muCerca,
         muMedia,
         muLejos,
@@ -534,7 +565,8 @@
         muDer,
         rules,
         outM1,
-        outM2
+        outM2,
+        isReversePure
       };
     }
 
@@ -550,12 +582,10 @@
       const dx = x - RADAR.cx;
       const dy = y - RADAR.cy;
 
-      // Calcular ángulo en grados (-90° izquierda a +90° derecha)
       let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
       if (angleDeg > 180) angleDeg -= 360;
       angleDeg = Math.max(-90, Math.min(90, Math.round(angleDeg)));
 
-      // Calcular distancia radial y mapearla a [10 cm, 100 cm]
       const pixelDist = Math.hypot(dx, dy);
       const clampedRadius = Math.max(RADAR.minRadius, Math.min(RADAR.maxRadius, pixelDist));
       const norm = (clampedRadius - RADAR.minRadius) / (RADAR.maxRadius - RADAR.minRadius);
@@ -596,31 +626,29 @@
       updateSimulation();
     });
 
-    // Permitir ajuste fino con la rueda del mouse sobre el radar
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
       if (e.shiftKey) {
-        // Shift + Rueda ajusta el ángulo
         state.ang = Math.max(-90, Math.min(90, state.ang + Math.sign(e.deltaY) * 2));
       } else {
-        // Rueda normal ajusta la distancia
         state.dist = Math.max(10, Math.min(100, state.dist - Math.sign(e.deltaY) * 2));
       }
       updateSimulation();
     }, { passive: false });
 
     // Dibujado del Radar en Canvas
-    function drawRadar(dist, ang, outM1, outM2) {
+    function drawRadar(dist, ang, res) {
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
       const { cx, cy, maxRadius, minRadius } = RADAR;
+      const isEmergency = res.muMuyCerca > 0.3;
 
       // Gradiente cónico del haz sonar
       const rad = (ang - 90) * (Math.PI / 180);
       const beamGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxRadius);
-      beamGrad.addColorStop(0, "rgba(59, 130, 246, 0.28)");
+      beamGrad.addColorStop(0, isEmergency ? "rgba(239, 68, 68, 0.35)" : "rgba(59, 130, 246, 0.28)");
       beamGrad.addColorStop(1, "rgba(59, 130, 246, 0.0)");
 
       ctx.save();
@@ -631,6 +659,15 @@
       ctx.fillStyle = beamGrad;
       ctx.fill();
       ctx.restore();
+
+      // Zona crítica roja de colisión (< 23 cm)
+      const dangerRadius = ((23 - 10) / 90) * (maxRadius - minRadius) + minRadius;
+      ctx.beginPath();
+      ctx.arc(cx, cy, dangerRadius, Math.PI, 0, false);
+      ctx.strokeStyle = "rgba(239, 68, 68, 0.45)";
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
       // Arcos concéntricos del radar
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
@@ -650,15 +687,35 @@
         ctx.stroke();
       }
 
-      // Vector resultante de dirección del robot
-      const steerAngle = ((outM1 - outM2) / 100) * 0.85 - Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 12);
-      ctx.lineTo(cx + Math.cos(steerAngle) * 58, cy - 12 + Math.sin(steerAngle) * 58);
-      ctx.strokeStyle = "#93c5fd";
-      ctx.lineWidth = 2.5;
+      // Vector resultante de dirección / escape del robot
+      ctx.save();
+      ctx.lineWidth = 2.8;
       ctx.lineCap = "round";
-      ctx.stroke();
+
+      if (res.outM1 < 0 && res.outM2 < 0) {
+        // Reversa directa hacia atrás (+90° abajo)
+        ctx.strokeStyle = "#f87171";
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 12);
+        ctx.lineTo(cx, cy + 38);
+        ctx.stroke();
+      } else if (res.outM1 < 0 || res.outM2 < 0) {
+        // Giro de escape de 180° (arco de media vuelta)
+        const dirSign = res.outM1 > res.outM2 ? 1 : -1;
+        ctx.strokeStyle = "#f87171";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 34, -Math.PI / 2, -Math.PI / 2 + dirSign * Math.PI * 0.88, dirSign < 0);
+        ctx.stroke();
+      } else {
+        // Avance / evasión normal hacia adelante
+        const steerAngle = ((res.outM1 - res.outM2) / 100) * 0.85 - Math.PI / 2;
+        ctx.strokeStyle = "#93c5fd";
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 12);
+        ctx.lineTo(cx + Math.cos(steerAngle) * 58, cy - 12 + Math.sin(steerAngle) * 58);
+        ctx.stroke();
+      }
+      ctx.restore();
 
       // Posición del obstáculo detectado
       const normDist = ((dist - 10) / 90) * (maxRadius - minRadius) + minRadius;
@@ -671,7 +728,7 @@
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(obsX, obsY);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.strokeStyle = isEmergency ? "rgba(248, 113, 113, 0.7)" : "rgba(255, 255, 255, 0.4)";
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.restore();
@@ -680,24 +737,24 @@
       const haloRadius = state.isDragging ? 16 : (state.isHovering ? 14 : 12);
       ctx.beginPath();
       ctx.arc(obsX, obsY, haloRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = state.isDragging ? "#60a5fa" : "rgba(147, 197, 253, 0.55)";
+      ctx.strokeStyle = isEmergency ? "#ef4444" : (state.isDragging ? "#60a5fa" : "rgba(147, 197, 253, 0.55)");
       ctx.lineWidth = state.isDragging ? 2 : 1.5;
       ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(obsX, obsY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = state.isDragging ? "#ffffff" : "#93c5fd";
+      ctx.fillStyle = isEmergency ? "#f87171" : (state.isDragging ? "#ffffff" : "#93c5fd");
       ctx.fill();
 
       // Etiqueta de distancia junto al obstáculo
-      ctx.fillStyle = "#d1d5db";
+      ctx.fillStyle = isEmergency ? "#fca5a5" : "#d1d5db";
       ctx.font = "600 11px sans-serif";
       const labelOffsetX = obsX > w - 65 ? -44 : 14;
       ctx.fillText(`${dist}cm`, obsX + labelOffsetX, obsY + 4);
 
       // Chasis del Robot en la base
       ctx.fillStyle = "#181a1f";
-      ctx.strokeStyle = "#f3f4f6";
+      ctx.strokeStyle = isEmergency ? "#f87171" : "#f3f4f6";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.roundRect(cx - 14, cy - 12, 28, 22, 6);
@@ -705,7 +762,7 @@
       ctx.stroke();
 
       // Ruedas laterales del robot
-      ctx.fillStyle = "#93c5fd";
+      ctx.fillStyle = isEmergency ? "#f87171" : "#93c5fd";
       ctx.fillRect(cx - 18, cy - 8, 3, 14);
       ctx.fillRect(cx + 15, cy - 8, 3, 14);
 
@@ -727,16 +784,22 @@
       // Ejecutar motor difuso
       const res = computeFuzzyLogic(dist, ang);
 
-      // Actualizar barras de motores
-      barM1.style.width = `${res.outM1}%`;
-      valM1.textContent = `${res.outM1}%`;
-      barM2.style.width = `${res.outM2}%`;
-      valM2.textContent = `${res.outM2}%`;
+      // Actualizar barras de motores (soporta potencia negativa / reversa)
+      barM1.style.width = `${Math.abs(res.outM1)}%`;
+      barM1.style.backgroundColor = res.outM1 < 0 ? "var(--accent-red)" : "var(--accent-blue)";
+      valM1.textContent = `${res.outM1 > 0 ? "+" : ""}${res.outM1}%`;
+
+      barM2.style.width = `${Math.abs(res.outM2)}%`;
+      barM2.style.backgroundColor = res.outM2 < 0 ? "var(--accent-red)" : "var(--accent-indigo)";
+      valM2.textContent = `${res.outM2 > 0 ? "+" : ""}${res.outM2}%`;
 
       // Actualizar barras de pertenencia (Fuzzification)
+      const dominantDist = Math.max(res.muMuyCerca, res.muCerca);
       const dominantAng = Math.max(res.muIzq, res.muCtr, res.muDer);
-      barFuzzDist.style.width = `${Math.round(res.muCerca * 100)}%`;
-      valFuzzDist.textContent = res.muCerca.toFixed(2);
+
+      barFuzzDist.style.width = `${Math.round(dominantDist * 100)}%`;
+      barFuzzDist.style.backgroundColor = res.muMuyCerca > 0.3 ? "var(--accent-red)" : "var(--accent-green)";
+      valFuzzDist.textContent = dominantDist.toFixed(2);
 
       barFuzzAng.style.width = `${Math.round(dominantAng * 100)}%`;
       valFuzzAng.textContent = dominantAng.toFixed(2);
@@ -746,15 +809,22 @@
         const box = document.getElementById(`rule-${r.id}`);
         const weightEl = document.getElementById(`w-${r.id}`);
         weightEl.textContent = r.w.toFixed(2);
+
+        box.classList.remove("active", "danger-active");
         if (r.w > 0.01) {
-          box.classList.add("active");
-        } else {
-          box.classList.remove("active");
+          if (r.id === "r8") {
+            box.classList.add("danger-active");
+          } else {
+            box.classList.add("active");
+          }
         }
       });
 
       // Actualizar badges de estado y acción
-      if (dist < 30) {
+      if (res.muMuyCerca > 0.3) {
+        statusBadge.textContent = "Colisión Inminente";
+        statusBadge.className = "badge danger";
+      } else if (dist < 35) {
         statusBadge.textContent = "Peligro Crítico";
         statusBadge.className = "badge danger";
       } else if (dist < 65) {
@@ -765,19 +835,28 @@
         statusBadge.className = "badge safe";
       }
 
-      if (Math.abs(res.outM1 - res.outM2) <= 4) {
+      if (res.outM1 < 0 && res.outM2 < 0) {
+        actionBadge.textContent = "Reversa de Escape";
+        actionBadge.className = "badge danger";
+      } else if (res.outM1 < 0 || res.outM2 < 0) {
+        actionBadge.textContent = "Giro Escape 180°";
+        actionBadge.className = "badge danger";
+      } else if (Math.abs(res.outM1 - res.outM2) <= 4) {
         actionBadge.textContent = "Avance Recto";
-      } else if (ang > 0) {
+        actionBadge.className = "badge neutral";
+      } else if (res.outM1 > res.outM2) {
         actionBadge.textContent = "Desvío Derecha";
+        actionBadge.className = "badge neutral";
       } else {
         actionBadge.textContent = "Desvío Izquierda";
+        actionBadge.className = "badge neutral";
       }
 
       // Redibujar radar
-      drawRadar(dist, ang, res.outM1, res.outM2);
+      drawRadar(dist, ang, res);
     }
 
-    // Inicialización con los valores de tu captura (95 cm, +4°)
+    // Inicialización
     updateSimulation();
   </script>
 </body>
