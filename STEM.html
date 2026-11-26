@@ -20,35 +20,39 @@
             -webkit-user-select: none;
         }
 
-        /* Layout principal lado a lado (Panel a la izquierda + Arena ocupando el resto) */
-        #app-layout {
-            display: flex;
-            flex-direction: row;
-            align-items: stretch;
+        /* Contenedor principal centrado con tamaño fijo de bloque (como en la imagen) */
+        #stage-container {
             width: 100%;
             height: 100%;
-            padding: 14px;
-            gap: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
             box-sizing: border-box;
         }
 
-        /* Panel lateral izquierdo fijo */
+        /* Grupo de interfaz + pista de tamaño fijo */
+        #app-layout {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 14px;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Panel lateral izquierdo con dimensiones fijas */
         #ui-panel {
             position: relative;
             flex-shrink: 0;
             width: 315px;
-            max-width: 100%;
-            height: fit-content;
-            max-height: 100%;
-            overflow-y: auto;
             background: #282831;
             border: 1px solid rgba(243, 156, 18, 0.35);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
             z-index: 10;
             box-sizing: border-box;
-            transition: box-shadow 0.2s;
         }
 
         /* Cuando el usuario arrastra el panel manualmente, pasa a modo flotante */
@@ -57,15 +61,14 @@
             margin: 0;
         }
 
-        /* Contenedor de la arena delimitada ocupando todo el espacio derecho */
+        /* Contenedor de la arena de tamaño fijo */
         #arena-wrapper {
             position: relative;
-            flex: 1;
-            min-width: 0;
-            min-height: 0;
-            display: flex;
-            align-items: stretch;
-            justify-content: stretch;
+            flex-shrink: 0;
+            width: 760px;
+            height: 550px;
+            max-width: calc(100vw - 365px);
+            max-height: calc(100vh - 32px);
         }
 
         canvas {
@@ -120,7 +123,7 @@
             color: #ecf0f1;
         }
 
-        /* Estilizado personalizado de sliders para igualar la pista y el pulgar naranja */
+        /* Estilizado personalizado de sliders */
         input[type="range"] {
             -webkit-appearance: none;
             appearance: none;
@@ -212,87 +215,81 @@
         button.btn-reset:active {
             transform: scale(0.99);
         }
-
-        /* Adaptación responsiva en pantallas estrechas */
-        @media (max-width: 768px) {
-            #app-layout {
-                flex-direction: column;
-            }
-            #ui-panel {
-                width: 100%;
-                max-height: 45%;
-            }
-        }
     </style>
 </head>
 <body>
-    <div id="app-layout">
-        <!-- Panel de control y telemetría STEM -->
-        <aside id="ui-panel" aria-label="Controles de simulación EV3">
-            <h2 id="ui-panel-header" title="Arrastra para mover este panel">
-                <span>Arquitectura Reactiva EV3</span>
-                <span class="drag-grip" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <circle cx="5" cy="3.5" r="1.2"/>
-                        <circle cx="11" cy="3.5" r="1.2"/>
-                        <circle cx="5" cy="8" r="1.2"/>
-                        <circle cx="11" cy="8" r="1.2"/>
-                        <circle cx="5" cy="12.5" r="1.2"/>
-                        <circle cx="11" cy="12.5" r="1.2"/>
-                    </svg>
-                </span>
-            </h2>
+    <div id="stage-container">
+        <div id="app-layout">
+            <!-- Panel de control y telemetría STEM -->
+            <aside id="ui-panel" aria-label="Controles de simulación EV3">
+                <h2 id="ui-panel-header" title="Arrastra para mover este panel">
+                    <span>Arquitectura Reactiva EV3</span>
+                    <span class="drag-grip" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <circle cx="5" cy="3.5" r="1.2"/>
+                            <circle cx="11" cy="3.5" r="1.2"/>
+                            <circle cx="5" cy="8" r="1.2"/>
+                            <circle cx="11" cy="8" r="1.2"/>
+                            <circle cx="5" cy="12.5" r="1.2"/>
+                            <circle cx="11" cy="12.5" r="1.2"/>
+                        </svg>
+                    </span>
+                </h2>
 
-            <div class="control-group">
-                <label for="slider-robots">
-                    <span>Robots en Prueba</span>
-                    <span id="val-robots">2</span>
-                </label>
-                <input type="range" id="slider-robots" min="1" max="5" step="1" value="2">
-            </div>
+                <div class="control-group">
+                    <label for="slider-robots">
+                        <span>Robots en Prueba</span>
+                        <span id="val-robots">2</span>
+                    </label>
+                    <input type="range" id="slider-robots" min="1" max="5" step="1" value="2">
+                </div>
 
-            <div class="control-group">
-                <label for="slider-sensor">
-                    <span>Rango del Ultrasónico</span>
-                    <span id="val-sensor">70px</span>
-                </label>
-                <span class="desc">Distancia umbral para activar el desvío.</span>
-                <input type="range" id="slider-sensor" min="30" max="70" step="1" value="70">
-            </div>
+                <div class="control-group">
+                    <label for="slider-sensor">
+                        <span>Rango del Ultrasónico</span>
+                        <span id="val-sensor">70px</span>
+                    </label>
+                    <span class="desc">Distancia umbral para activar el desvío.</span>
+                    <input type="range" id="slider-sensor" min="30" max="70" step="1" value="70">
+                </div>
 
-            <div class="control-group">
-                <label for="slider-vel">
-                    <span>Velocidad de Motores</span>
-                    <span id="val-vel">3.0</span>
-                </label>
-                <input type="range" id="slider-vel" min="1" max="3" step="0.1" value="3">
-            </div>
+                <div class="control-group">
+                    <label for="slider-vel">
+                        <span>Velocidad de Motores</span>
+                        <span id="val-vel">3.0</span>
+                    </label>
+                    <input type="range" id="slider-vel" min="1" max="3" step="0.1" value="3">
+                </div>
 
-            <div id="stats-board">
-                <div class="stat-value" id="val-colisiones">0</div>
-                <div class="stat-label">Colisiones Registradas</div>
-            </div>
+                <div id="stats-board">
+                    <div class="stat-value" id="val-colisiones">0</div>
+                    <div class="stat-label">Colisiones Registradas</div>
+                </div>
 
-            <button type="button" class="btn-reset" id="btn-reiniciar" onclick="reiniciarPrueba()">
-                Reiniciar Experimento
-            </button>
+                <button type="button" class="btn-reset" id="btn-reiniciar" onclick="reiniciarPrueba()">
+                    Reiniciar Experimento
+                </button>
 
-            <p class="text-[0.72rem] text-[#9ca3af] text-center mt-4 mb-0 leading-relaxed">
-                Arrastra los círculos (obstáculos) dentro de la pista para reorganizar la arena.
-            </p>
-        </aside>
+                <p class="text-[0.72rem] text-[#9ca3af] text-center mt-4 mb-0 leading-relaxed">
+                    Arrastra los círculos (obstáculos) dentro de la pista para reorganizar la arena.
+                </p>
+            </aside>
 
-        <!-- Arena delimitada ocupando todo el espacio derecho -->
-        <main id="arena-wrapper" aria-label="Pista de simulación">
-            <canvas id="simCanvas"></canvas>
-        </main>
+            <!-- Arena delimitada de tamaño fijo -->
+            <main id="arena-wrapper" aria-label="Pista de simulación">
+                <canvas id="simCanvas" width="760" height="550"></canvas>
+            </main>
+        </div>
     </div>
 
     <script>
         // Referencias al canvas y contexto 2D
-        const arenaWrapper = document.getElementById('arena-wrapper');
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+
+        // Dimensiones lógicas constantes de la arena
+        const ARENA_WIDTH = 760;
+        const ARENA_HEIGHT = 550;
 
         // Referencias a elementos de interfaz
         const uiPanel = document.getElementById('ui-panel');
@@ -354,7 +351,6 @@
                 uiPanel.style.width = rect.width + 'px';
                 uiPanel.style.left = rect.left + 'px';
                 uiPanel.style.top = rect.top + 'px';
-                resize();
             }
             arrastrandoPanel = true;
             offsetPanelX = clientX - rect.left;
@@ -395,38 +391,15 @@
         window.addEventListener('touchcancel', finalizarArrastrePanel);
 
         /**
-         * Ajusta el tamaño del lienzo al contenedor derecho y reposiciona obstáculos y robots si es necesario.
+         * Mantiene las dimensiones internas fijas de la pista para que nunca cambie de tamaño.
          */
         function resize() {
-            try {
-                const prevWidth = canvas.width;
-                const prevHeight = canvas.height;
-                const rect = arenaWrapper.getBoundingClientRect();
-                const width = Math.max(260, Math.round(rect.width));
-                const height = Math.max(240, Math.round(rect.height));
+            canvas.width = ARENA_WIDTH;
+            canvas.height = ARENA_HEIGHT;
 
-                canvas.width = width;
-                canvas.height = height;
-
-                if (prevWidth > 0 && prevHeight > 0 && obstaculos.length > 0) {
-                    for (let i = 0; i < obstaculos.length; i++) {
-                        const obs = obstaculos[i];
-                        obs.x = Math.min(Math.max(obs.radius + 12, (obs.x / prevWidth) * canvas.width), canvas.width - obs.radius - 12);
-                        obs.y = Math.min(Math.max(obs.radius + 12, (obs.y / prevHeight) * canvas.height), canvas.height - obs.radius - 12);
-                    }
-                    for (let i = 0; i < robots.length; i++) {
-                        const rob = robots[i];
-                        rob.x = Math.min(Math.max(rob.radius + 10, rob.x), canvas.width - rob.radius - 10);
-                        rob.y = Math.min(Math.max(rob.radius + 10, rob.y), canvas.height - rob.radius - 10);
-                    }
-                }
-
-                if (uiPanel.classList.contains('floating')) {
-                    const rectPanel = uiPanel.getBoundingClientRect();
-                    limitarPosicionPanel(rectPanel.left, rectPanel.top);
-                }
-            } catch (err) {
-                console.error('Error al redimensionar la pista:', err);
+            if (uiPanel.classList.contains('floating')) {
+                const rectPanel = uiPanel.getBoundingClientRect();
+                limitarPosicionPanel(rectPanel.left, rectPanel.top);
             }
         }
 
@@ -465,19 +438,18 @@
          * Genera los 6 obstáculos circulares en las posiciones y tamaños relativos exactos de referencia.
          */
         function generarObstaculos() {
-            const escalaBase = Math.min(canvas.width / 820, canvas.height / 580);
             const configuracionObstaculos = [
-                { x: 0.335 * canvas.width, y: 0.20 * canvas.height,  radius: Math.max(18, 29 * escalaBase) }, // 1. Superior izquierda
-                { x: 0.51 * canvas.width,  y: 0.37 * canvas.height,  radius: Math.max(18, 29 * escalaBase) }, // 2. Central superior
-                { x: 0.685 * canvas.width, y: 0.29 * canvas.height,  radius: Math.max(16, 25 * escalaBase) }, // 3. Superior derecha
-                { x: 0.333 * canvas.width, y: 0.59 * canvas.height,  radius: Math.max(18, 29 * escalaBase) }, // 4. Inferior izquierda
-                { x: 0.495 * canvas.width, y: 0.725 * canvas.height, radius: Math.max(22, 35 * escalaBase) }, // 5. Inferior central (más grande)
-                { x: 0.635 * canvas.width, y: 0.74 * canvas.height,  radius: Math.max(16, 25 * escalaBase) }  // 6. Inferior derecha
+                { x: 0.335 * ARENA_WIDTH, y: 0.20 * ARENA_HEIGHT,  radius: 28 }, // 1. Superior izquierda
+                { x: 0.51 * ARENA_WIDTH,  y: 0.37 * ARENA_HEIGHT,  radius: 28 }, // 2. Central superior
+                { x: 0.685 * ARENA_WIDTH, y: 0.29 * ARENA_HEIGHT,  radius: 24 }, // 3. Superior derecha
+                { x: 0.333 * ARENA_WIDTH, y: 0.59 * ARENA_HEIGHT,  radius: 28 }, // 4. Inferior izquierda
+                { x: 0.495 * ARENA_WIDTH, y: 0.725 * ARENA_HEIGHT, radius: 34 }, // 5. Inferior central (más grande)
+                { x: 0.635 * ARENA_WIDTH, y: 0.74 * ARENA_HEIGHT,  radius: 24 }  // 6. Inferior derecha
             ];
 
             obstaculos = configuracionObstaculos.map((obs) => ({
-                x: Math.min(Math.max(obs.radius + 12, obs.x), canvas.width - obs.radius - 12),
-                y: Math.min(Math.max(obs.radius + 12, obs.y), canvas.height - obs.radius - 12),
+                x: obs.x,
+                y: obs.y,
                 radius: obs.radius,
                 isDragging: false
             }));
@@ -490,8 +462,8 @@
             constructor(id) {
                 this.id = id;
                 this.radius = 12;
-                this.x = 30 + Math.random() * Math.max(40, canvas.width - 60);
-                this.y = 30 + Math.random() * Math.max(40, canvas.height - 60);
+                this.x = 30 + Math.random() * (ARENA_WIDTH - 60);
+                this.y = 30 + Math.random() * (ARENA_HEIGHT - 60);
                 this.angle = Math.random() * Math.PI * 2;
                 this.tasaGiroAleatorio = (Math.random() - 0.5) * 0.04;
                 this.pasosRestantesRumbo = 20 + Math.floor(Math.random() * 50);
@@ -634,21 +606,21 @@
                 if (this.x < this.radius + 6) {
                     this.x = this.radius + 6;
                     rebotoEnBorde = true;
-                } else if (this.x > canvas.width - this.radius - 6) {
-                    this.x = canvas.width - this.radius - 6;
+                } else if (this.x > ARENA_WIDTH - this.radius - 6) {
+                    this.x = ARENA_WIDTH - this.radius - 6;
                     rebotoEnBorde = true;
                 }
 
                 if (this.y < this.radius + 6) {
                     this.y = this.radius + 6;
                     rebotoEnBorde = true;
-                } else if (this.y > canvas.height - this.radius - 6) {
-                    this.y = canvas.height - this.radius - 6;
+                } else if (this.y > ARENA_HEIGHT - this.radius - 6) {
+                    this.y = ARENA_HEIGHT - this.radius - 6;
                     rebotoEnBorde = true;
                 }
 
                 if (rebotoEnBorde) {
-                    const anguloCentro = Math.atan2(canvas.height / 2 - this.y, canvas.width / 2 - this.x);
+                    const anguloCentro = Math.atan2(ARENA_HEIGHT / 2 - this.y, ARENA_WIDTH / 2 - this.x);
                     this.angle = this.normalizarAngulo(anguloCentro + (Math.random() - 0.5) * 0.8);
                     this.pasosRestantesRumbo = 25 + Math.floor(Math.random() * 40);
                 }
@@ -735,8 +707,8 @@
         // Soporte para arrastrar obstáculos con mouse y táctil
         function iniciarArrastre(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            const mX = (clientX - rect.left) * (canvas.width / rect.width);
-            const mY = (clientY - rect.top) * (canvas.height / rect.height);
+            const mX = (clientX - rect.left) * (ARENA_WIDTH / rect.width);
+            const mY = (clientY - rect.top) * (ARENA_HEIGHT / rect.height);
 
             for (let i = 0; i < obstaculos.length; i++) {
                 const obs = obstaculos[i];
@@ -750,11 +722,11 @@
         function moverArrastre(clientX, clientY) {
             if (!objetoArrastrado) return;
             const rect = canvas.getBoundingClientRect();
-            const mX = (clientX - rect.left) * (canvas.width / rect.width);
-            const mY = (clientY - rect.top) * (canvas.height / rect.height);
+            const mX = (clientX - rect.left) * (ARENA_WIDTH / rect.width);
+            const mY = (clientY - rect.top) * (ARENA_HEIGHT / rect.height);
 
-            objetoArrastrado.x = Math.min(Math.max(objetoArrastrado.radius, mX), canvas.width - objetoArrastrado.radius);
-            objetoArrastrado.y = Math.min(Math.max(objetoArrastrado.radius, mY), canvas.height - objetoArrastrado.radius);
+            objetoArrastrado.x = Math.min(Math.max(objetoArrastrado.radius, mX), ARENA_WIDTH - objetoArrastrado.radius);
+            objetoArrastrado.y = Math.min(Math.max(objetoArrastrado.radius, mY), ARENA_HEIGHT - objetoArrastrado.radius);
         }
 
         function finalizarArrastre() {
@@ -788,22 +760,22 @@
             try {
                 // Fondo delimitado de la pista
                 ctx.fillStyle = '#141417';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT);
 
                 // Dibujar cuadrícula sutil de referencia dentro de la pista
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
                 ctx.lineWidth = 1;
                 const pasoCuadricula = 40;
-                for (let x = pasoCuadricula; x < canvas.width; x += pasoCuadricula) {
+                for (let x = pasoCuadricula; x < ARENA_WIDTH; x += pasoCuadricula) {
                     ctx.beginPath();
                     ctx.moveTo(x, 0);
-                    ctx.lineTo(x, canvas.height);
+                    ctx.lineTo(x, ARENA_HEIGHT);
                     ctx.stroke();
                 }
-                for (let y = pasoCuadricula; y < canvas.height; y += pasoCuadricula) {
+                for (let y = pasoCuadricula; y < ARENA_HEIGHT; y += pasoCuadricula) {
                     ctx.beginPath();
                     ctx.moveTo(0, y);
-                    ctx.lineTo(canvas.width, y);
+                    ctx.lineTo(ARENA_WIDTH, y);
                     ctx.stroke();
                 }
 
