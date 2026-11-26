@@ -33,7 +33,7 @@
     color: var(--text-primary);
     display: flex;
     justify-content: center;
-    align-items: center; /* Centra verticalmente en toda la pantalla */
+    align-items: center;
     padding: 24px;
     min-height: 100vh;
   }
@@ -44,7 +44,7 @@
     display: grid;
     grid-template-columns: 320px 1fr;
     gap: 16px;
-    align-items: center; /* Alinea el panel izquierdo al centro vertical del lienzo */
+    align-items: stretch;
   }
 
   /* Panel Izquierdo: Parámetros */
@@ -55,6 +55,7 @@
     padding: 20px;
     display: flex;
     flex-direction: column;
+    height: 540px;
   }
 
   .panel-header {
@@ -63,7 +64,7 @@
     align-items: flex-start;
     gap: 10px;
     padding-bottom: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     border-bottom: 1px solid var(--border-amber);
   }
 
@@ -94,8 +95,7 @@
   .sliders-stack {
     display: flex;
     flex-direction: column;
-    gap: 22px;
-    margin-bottom: 26px;
+    gap: 26px;
   }
 
   .slider-header {
@@ -165,9 +165,9 @@
   }
 
   .action-buttons {
+    margin-top: auto;
     display: flex;
     flex-direction: column;
-    gap: 10px;
   }
 
   .btn-action {
@@ -187,10 +187,6 @@
     transition: background-color 0.15s ease;
   }
 
-  .btn-action:hover {
-    background-color: #36353d;
-  }
-
   .btn-action.primary {
     background-color: var(--accent-amber);
     border-color: var(--accent-amber);
@@ -199,14 +195,6 @@
 
   .btn-action.primary:hover {
     background-color: var(--accent-amber-hover);
-  }
-
-  .panel-footer-hint {
-    margin-top: 16px;
-    text-align: center;
-    font-size: 0.74rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
   }
 
   /* Panel Derecho: Lienzo de Simulación */
@@ -230,6 +218,12 @@
     .app-shell {
       grid-template-columns: 1fr;
     }
+    .controls-card {
+      height: auto;
+    }
+    .action-buttons {
+      margin-top: 24px;
+    }
     .canvas-card {
       height: 400px;
     }
@@ -242,7 +236,7 @@
   <!-- Panel Izquierdo: Parámetros -->
   <aside class="controls-card">
     <div class="panel-header">
-      <div class="header-title">Enjambres con Inferencia Difusa Híbrida</div>
+      <div class="header-title">Enjambres con Inferencia Difusa</div>
       <div class="grip-icon" aria-hidden="true">
         <span></span><span></span>
         <span></span><span></span>
@@ -271,12 +265,6 @@
 
     <div class="action-buttons">
       <button class="btn-action primary" id="resetBtn">Reiniciar Simulación</button>
-      <button class="btn-action" id="pauseBtn">❚❚ Pausar</button>
-    </div>
-
-    <div class="panel-footer-hint">
-      Radio físico R = 0.25 m · Halo líder = r<sub>sens</sub><br>
-      Haz clic o arrastra en el lienzo para mover la meta azul.
     </div>
   </aside>
 
@@ -454,12 +442,10 @@ const nSlider = document.getElementById('nSlider');
 const rSlider = document.getElementById('rSlider');
 const nBadge = document.getElementById('nBadge');
 const rBadge = document.getElementById('rBadge');
-const pauseBtn = document.getElementById('pauseBtn');
 const resetBtn = document.getElementById('resetBtn');
 
 let swarms = [];
 let simTime = 0;
-let paused = false;
 let isDraggingGoal = false;
 
 const PIXELS_PER_METER = 38;
@@ -574,25 +560,9 @@ function drawScene() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  // 2. Barra de escala "2.0 m" en esquina inferior izquierda
-  const scaleX = 24;
-  const scaleY = canvas.height - 20;
-  const barW = 2.0 * PIXELS_PER_METER;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(scaleX, scaleY); ctx.lineTo(scaleX + barW, scaleY);
-  ctx.moveTo(scaleX, scaleY - 4); ctx.lineTo(scaleX, scaleY + 4);
-  ctx.moveTo(scaleX + barW, scaleY - 4); ctx.lineTo(scaleX + barW, scaleY + 4);
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-  ctx.font = '11px monospace';
-  ctx.fillText('2.0 m', scaleX + barW + 8, scaleY + 4);
-
   const rSensorPx = parseFloat(rSlider.value) * PIXELS_PER_METER;
 
-  // 3. Dibujar enjambres
+  // 2. Dibujar enjambres
   for (const swarm of swarms) {
     if (swarm.agents.length > 0) {
       const leaderPos = worldToScreen(swarm.agents[0].x, swarm.agents[0].y);
@@ -650,9 +620,7 @@ function drawScene() {
 }
 
 function animate() {
-  if (!paused) {
-    stepPhysics(0.025);
-  }
+  stepPhysics(0.025);
   drawScene();
   requestAnimationFrame(animate);
 }
@@ -669,11 +637,6 @@ nSlider.addEventListener('input', () => {
 rSlider.addEventListener('input', () => {
   rBadge.textContent = `${parseFloat(rSlider.value).toFixed(1)} m`;
   updateSliderFill(rSlider);
-});
-
-pauseBtn.addEventListener('click', () => {
-  paused = !paused;
-  pauseBtn.innerHTML = paused ? '▶ Reanudar' : '❚❚ Pausar';
 });
 
 resetBtn.addEventListener('click', initSimulation);
