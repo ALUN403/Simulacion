@@ -79,33 +79,6 @@
     height: 100%;
   }
 
-  .legend-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-    margin-top: 12px;
-    font-size: 0.8rem;
-  }
-
-  .legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .legend-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-  }
-
-  .canvas-hint {
-    font-size: 0.76rem;
-    color: var(--text-secondary);
-    margin-top: 6px;
-  }
-
   /* Controls Card */
   .sliders-grid {
     display: grid;
@@ -206,12 +179,6 @@
     <div class="canvas-container" id="canvasBox">
       <canvas id="simCanvas"></canvas>
     </div>
-    <div class="legend-row">
-      <div class="legend-item"><span class="legend-dot" style="background:#8ab4f8"></span>Enjambre 1 (Azul - meta móvil)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#f48fb1"></span>Enjambre 2 (Magenta)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#81c995"></span>Enjambre 3 (Verde)</div>
-    </div>
-    <div class="canvas-hint">Clic o arrastre en el lienzo para reubicar meta Azul</div>
   </div>
 
   <!-- Panel Inferior: Parámetros y Controles -->
